@@ -40,3 +40,35 @@ func TestReportZeroValue(t *testing.T) {
 		t.Fatalf("zero Report should have no findings")
 	}
 }
+func TestIsSeverityAtLeast(t *testing.T) {
+	aff := Finding{Status: FindingStatusAffected}
+	na := Finding{Status: FindingStatusNotAffected}
+	unk := Finding{Status: FindingStatusUnknown}
+	affKEV := Finding{Status: FindingStatusAffected, KnownExploited: &KEVInfo{CVEID: "CVE-X"}}
+
+	cases := []struct {
+		name      string
+		f         Finding
+		threshold string
+		want      bool
+	}{
+		{"empty threshold", aff, "", false},
+		{"none", aff, "none", false},
+		{"any with affected", aff, "any", true},
+		{"any with not_affected", na, "any", true},
+		{"affected with affected", aff, "affected", true},
+		{"affected with not_affected", na, "affected", false},
+		{"affected with unknown", unk, "affected", false},
+		{"kev with kev", affKEV, "kev", true},
+		{"kev without kev", aff, "kev", false},
+		{"unknown threshold", aff, "bogus", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.f.IsSeverityAtLeast(tc.threshold)
+			if got != tc.want {
+				t.Fatalf("IsSeverityAtLeast(%q) = %v, want %v", tc.threshold, got, tc.want)
+			}
+		})
+	}
+}

@@ -20,6 +20,7 @@ type detectFlags struct {
 	PURL    string
 	Output  string
 	WithKEV bool
+	FailOn  string
 }
 
 func runDetect(args []string) error {
@@ -52,18 +53,31 @@ func runDetect(args []string) error {
 		return fmt.Errorf("detect: %w", err)
 	}
 
+	var renderErr error
 	switch flags.Output {
 	case "", "human":
-		return output.RenderHuman(os.Stdout, report)
+		renderErr = output.RenderHuman(os.Stdout, report)
 	case "json":
-		return output.RenderJSON(os.Stdout, report)
+		renderErr = output.RenderJSON(os.Stdout, report)
 	case "jsonl":
-		return output.RenderJSONL(os.Stdout, report)
+		renderErr = output.RenderJSONL(os.Stdout, report)
 	case "sarif":
-		return output.RenderSARIF(os.Stdout, report, Version)
+		renderErr = output.RenderSARIF(os.Stdout, report, Version)
 	default:
 		return fmt.Errorf("detect: unsupported --output %q", flags.Output)
 	}
+	if renderErr != nil {
+		return renderErr
+	}
+
+	if flags.FailOn != "" {
+		for _, f := range report.Findings {
+			if f.IsSeverityAtLeast(flags.FailOn) {
+				return fmt.Errorf("detect: fail-on %q triggered by %s", flags.FailOn, f.VulnerabilityID)
+			}
+		}
+	}
+	return nil
 }
 
 func parseDetectArgs(args []string) (detectFlags, error) {
@@ -100,6 +114,8 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 			f.CPE = value
 		case "--purl":
 			f.PURL = value
+		case "--fail-on":
+			f.FailOn = value
 		case "--output":
 			f.Output = value
 		default:

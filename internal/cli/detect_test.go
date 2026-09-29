@@ -99,3 +99,15 @@ func TestValidateDetectFlagsAcceptsJSONL(t *testing.T) {
 		t.Fatalf("jsonl should be accepted, got: %v", err)
 	}
 }
+
+func TestParseDetectArgsFailOn(t *testing.T) {
+	got, err := parseDetectArgs([]string{
+		"--product", "Apache", "--version", "2.4.49", "--fail-on", "affected",
+	})
+	if err != nil {
+		t.Fatalf("parseDetectArgs: %v", err)
+	}
+	if got.FailOn != "affected" {
+		t.Fatalf("FailOn = %q", got.FailOn)
+	}
+}

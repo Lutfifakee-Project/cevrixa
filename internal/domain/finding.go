@@ -49,3 +49,18 @@ type Report struct {
 	Target   Target    `json:"target"`
 	Findings []Finding `json:"findings"`
 }
+
+func (f Finding) IsSeverityAtLeast(threshold string) bool {
+	switch threshold {
+	case "", "none":
+		return false
+	case "any":
+		return true
+	case "affected":
+		return f.Status == FindingStatusAffected || f.Status == FindingStatusConflict
+	case "kev":
+		return f.KnownExploited != nil
+	default:
+		return false
+	}
+}

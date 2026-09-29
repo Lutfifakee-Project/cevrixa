@@ -18,6 +18,7 @@ type scanFlags struct {
 	Input   string
 	Output  string
 	WithKEV bool
+	FailOn  string
 }
 
 func runScan(args []string) error {
@@ -99,6 +100,10 @@ func parseScanArgs(args []string) (scanFlags, error) {
 		switch key {
 		case "--output":
 			f.Output = value
+
+		case "--fail-on":
+			f.FailOn = value
+
 		default:
 			return f, fmt.Errorf("scan: unknown flag %q", key)
 		}
