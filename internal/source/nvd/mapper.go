@@ -10,6 +10,7 @@ func mapVulnerability(cve apiCVE) domain.Vulnerability {
 		Status:           cve.VulnStatus,
 		Published:        cve.Published,
 		Modified:         cve.LastModified,
+		Risk:             mapRisk(cve.Metrics),
 	}
 
 	for _, d := range cve.Descriptions {
@@ -39,6 +40,35 @@ func mapVulnerability(cve apiCVE) domain.Vulnerability {
 	return result
 }
 
+func mapRisk(metrics apiMetrics) *domain.Risk {
+	var chosen *apiCVSSMetric
+	switch {
+	case len(metrics.CVSSMetricV31) > 0:
+		chosen = &metrics.CVSSMetricV31[0]
+	case len(metrics.CVSSMetricV30) > 0:
+		chosen = &metrics.CVSSMetricV30[0]
+	case len(metrics.CVSSMetricV2) > 0:
+		chosen = &metrics.CVSSMetricV2[0]
+	default:
+		return nil
+	}
+
+	severity := chosen.CVSSData.BaseSeverity
+	if severity == "" {
+		severity = chosen.BaseSeverity
+	}
+
+	if severity == "" && chosen.CVSSData.BaseScore == 0 && chosen.CVSSData.Version == "" {
+		return nil
+	}
+
+	return &domain.Risk{
+		Severity:    severity,
+		CVSS:        chosen.CVSSData.BaseScore,
+		CVSSVersion: chosen.CVSSData.Version,
+	}
+}
+
 func mapNode(node apiConfigNode) domain.ApplicabilityNode {
 	out := domain.ApplicabilityNode{
 		Operator: node.Operator,
@@ -59,17 +89,17 @@ func mapNode(node apiConfigNode) domain.ApplicabilityNode {
 		}
 		if m.VersionStartIncluding != "" {
 			cm.VersionStart = m.VersionStartIncluding
-			cm.VersionStartMode = "including"
+			cm.VersionStartMode = domain.BoundModeIncluding
 		} else if m.VersionStartExcluding != "" {
 			cm.VersionStart = m.VersionStartExcluding
-			cm.VersionStartMode = "excluding"
+			cm.VersionStartMode = domain.BoundModeExcluding
 		}
 		if m.VersionEndIncluding != "" {
 			cm.VersionEnd = m.VersionEndIncluding
-			cm.VersionEndMode = "including"
+			cm.VersionEndMode = domain.BoundModeIncluding
 		} else if m.VersionEndExcluding != "" {
 			cm.VersionEnd = m.VersionEndExcluding
-			cm.VersionEndMode = "excluding"
+			cm.VersionEndMode = domain.BoundModeExcluding
 		}
 		out.Matches = append(out.Matches, cm)
 	}

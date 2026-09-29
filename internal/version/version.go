@@ -329,6 +329,31 @@ func ParseRange(expr string) (Range, error) {
 
 	return NewRange(lower, upper)
 }
+func ParseLenient(input string) (Version, error) {
+	if v, err := Parse(input); err == nil {
+		return v, nil
+	}
+
+	s := strings.TrimSpace(input)
+	if s == "" {
+		return Version{}, fmt.Errorf("version: empty input")
+	}
+
+	// Strip Debian/RPM epoch prefix "N:rest".
+	if idx := strings.IndexByte(s, ':'); idx > 0 && allDigits(s[:idx]) {
+		s = s[idx+1:]
+	}
+
+	// Strip leading tilde (Debian pre-release marker) so "~1.2.3" parses as "1.2.3".
+	s = strings.TrimPrefix(s, "~")
+
+	// Strip trailing whitespace-separated junk such as "1.2.3 something".
+	if idx := strings.IndexAny(s, " \t"); idx >= 0 {
+		s = s[:idx]
+	}
+
+	return Parse(s)
+}
 
 func allDigits(s string) bool {
 	if s == "" {

@@ -22,6 +22,7 @@ type apiCVE struct {
 	Descriptions     []apiDescription `json:"descriptions"`
 	Configurations   []apiConfigNode  `json:"configurations"`
 	References       []apiReference   `json:"references"`
+	Metrics          apiMetrics       `json:"metrics"`
 }
 
 type apiDescription struct {
@@ -49,4 +50,23 @@ type apiCPEMatch struct {
 type apiReference struct {
 	URL  string   `json:"url"`
 	Tags []string `json:"tags"`
+}
+
+type apiMetrics struct {
+	CVSSMetricV31 []apiCVSSMetric `json:"cvssMetricV31"`
+	CVSSMetricV30 []apiCVSSMetric `json:"cvssMetricV30"`
+	CVSSMetricV2  []apiCVSSMetric `json:"cvssMetricV2"`
+}
+
+type apiCVSSMetric struct {
+	Source       string      `json:"source"`
+	Type         string      `json:"type"`
+	CVSSData     apiCVSSData `json:"cvssData"`
+	BaseSeverity string      `json:"baseSeverity"`
+}
+
+type apiCVSSData struct {
+	Version      string  `json:"version"`
+	BaseScore    float64 `json:"baseScore"`
+	BaseSeverity string  `json:"baseSeverity"`
 }

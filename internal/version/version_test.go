@@ -155,3 +155,53 @@ func TestConflictingExactConstraints(t *testing.T) {
 		})
 	}
 }
+func TestParseLenientStrict(t *testing.T) {
+	v, err := ParseLenient("2.4.49")
+	if err != nil {
+		t.Fatalf("ParseLenient: %v", err)
+	}
+	if v.Raw() != "2.4.49" {
+		t.Fatalf("Raw = %q, want 2.4.49", v.Raw())
+	}
+}
+
+func TestParseLenientStripsEpoch(t *testing.T) {
+	v, err := ParseLenient("1:2.4.7")
+	if err != nil {
+		t.Fatalf("ParseLenient: %v", err)
+	}
+	want := MustParse("2.4.7")
+	if !v.Equal(want) {
+		t.Fatalf("ParseLenient(1:2.4.7) should equal 2.4.7")
+	}
+}
+
+func TestParseLenientStripsTilde(t *testing.T) {
+	v, err := ParseLenient("~1.2.3")
+	if err != nil {
+		t.Fatalf("ParseLenient: %v", err)
+	}
+	want := MustParse("1.2.3")
+	if !v.Equal(want) {
+		t.Fatalf("ParseLenient(~1.2.3) should equal 1.2.3")
+	}
+}
+
+func TestParseLenientStripsTrailing(t *testing.T) {
+	v, err := ParseLenient("1.2.3 extra")
+	if err != nil {
+		t.Fatalf("ParseLenient: %v", err)
+	}
+	want := MustParse("1.2.3")
+	if !v.Equal(want) {
+		t.Fatalf("ParseLenient(1.2.3 extra) should equal 1.2.3")
+	}
+}
+
+func TestParseLenientRejectsGarbage(t *testing.T) {
+	for _, s := range []string{"", "v", "abc", "..."} {
+		if _, err := ParseLenient(s); err == nil {
+			t.Fatalf("ParseLenient(%q) unexpectedly succeeded", s)
+		}
+	}
+}
