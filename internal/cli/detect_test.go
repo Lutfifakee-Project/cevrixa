@@ -1,6 +1,9 @@
 package cli
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestValidateDetectFlags(t *testing.T) {
 	tests := []struct {
@@ -55,5 +58,25 @@ func TestParseDetectArgs(t *testing.T) {
 				t.Fatalf("got %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestDetectHelpReturnsNoError guards the CLI contract:
+// `cevrixa detect --help` must exit cleanly (exit code 0).
+func TestDetectHelpReturnsNoError(t *testing.T) {
+	if err := runDetect([]string{"--help"}); err != nil {
+		t.Fatalf("detect --help should return nil, got: %v", err)
+	}
+	if err := runDetect([]string{"-h"}); err != nil {
+		t.Fatalf("detect -h should return nil, got: %v", err)
+	}
+}
+
+// TestDetectNotImplemented guards the anti-fabrication contract:
+// detect must return errNotImplemented rather than pretending to succeed.
+func TestDetectNotImplemented(t *testing.T) {
+	err := runDetect([]string{"--product", "Apache", "--version", "2.4.49"})
+	if !errors.Is(err, errNotImplemented) {
+		t.Fatalf("detect should return errNotImplemented, got: %v", err)
 	}
 }

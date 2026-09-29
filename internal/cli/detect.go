@@ -5,6 +5,9 @@ import (
 	"fmt"
 )
 
+// errHelpRequested signals that --help was handled and Run should exit cleanly.
+var errHelpRequested = errors.New("help requested")
+
 type detectFlags struct {
 	Product string
 	Version string
@@ -14,6 +17,9 @@ type detectFlags struct {
 
 func runDetect(args []string) error {
 	flags, err := parseDetectArgs(args)
+	if errors.Is(err, errHelpRequested) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
@@ -30,7 +36,7 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 
 		if arg == "-h" || arg == "--help" {
 			printDetectUsage()
-			return f, nil
+			return detectFlags{}, errHelpRequested
 		}
 
 		key, value, hasInlineValue := splitFlag(arg)
@@ -110,5 +116,6 @@ Flags:
   --purl <purl>        Package URL
   -h, --help           Show this help
 
-Note: detection is intentionally not implemented in Phase 0.`)
+Note: detection is intentionally not implemented yet. This command validates
+input only and does not fabricate vulnerability results.`)
 }
