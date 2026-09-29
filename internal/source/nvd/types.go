@@ -1,7 +1,5 @@
 package nvd
 
-import "time"
-
 type apiResponse struct {
 	ResultsPerPage  int       `json:"resultsPerPage"`
 	StartIndex      int       `json:"startIndex"`
@@ -16,8 +14,8 @@ type apiVuln struct {
 type apiCVE struct {
 	ID               string           `json:"id"`
 	SourceIdentifier string           `json:"sourceIdentifier"`
-	Published        time.Time        `json:"published"`
-	LastModified     time.Time        `json:"lastModified"`
+	Published        nvdTime          `json:"published"`
+	LastModified     nvdTime          `json:"lastModified"`
 	VulnStatus       string           `json:"vulnStatus"`
 	Descriptions     []apiDescription `json:"descriptions"`
 	Configurations   []apiConfigNode  `json:"configurations"`

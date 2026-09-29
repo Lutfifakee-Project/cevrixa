@@ -1,27 +1,32 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/source/kev"
+	"github.com/Lutfifakee-Project/cevrixa/internal/source/nvd"
 	"github.com/Lutfifakee-Project/cevrixa/internal/store"
+	syncpkg "github.com/Lutfifakee-Project/cevrixa/internal/sync"
 )
 
 type syncFlags struct {
-	Target string // "kev" (extensible for "nvd", "osv", "all")
+	Target string
 	DBPath string
+	Days   int
 }
 
 func runSync(args []string) error {
 	if len(args) == 0 {
 		printSyncUsage()
-		return errors.New("sync: target required (try: kev)")
+		return errors.New("sync: target required (try: kev, nvd, or all)")
 	}
 
-	// First positional arg is the target; remaining args are flags.
 	target := ""
 	rest := args
 	if len(args) > 0 && args[0] != "-" && args[0][0] != '-' {
@@ -37,6 +42,9 @@ func runSync(args []string) error {
 		return err
 	}
 	flags.Target = target
+	if flags.Days == 0 {
+		flags.Days = 7
+	}
 
 	if flags.DBPath == "" {
 		p, err := defaultDBPath()
@@ -49,13 +57,18 @@ func runSync(args []string) error {
 	switch flags.Target {
 	case "kev":
 		return syncKEV(flags.DBPath)
+	case "nvd":
+		return syncNVDRemote(flags.DBPath, flags.Days)
 	case "all":
 		if err := syncKEV(flags.DBPath); err != nil {
 			return err
 		}
+		if err := syncNVDRemote(flags.DBPath, flags.Days); err != nil {
+			return err
+		}
 		return nil
 	default:
-		return fmt.Errorf("sync: unknown target %q (supported: kev, all)", flags.Target)
+		return fmt.Errorf("sync: unknown target %q (supported: kev, nvd, all)", flags.Target)
 	}
 }
 
@@ -66,7 +79,7 @@ func syncKEV(dbPath string) error {
 	}
 
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
-		return fmt.Errorf("sync kev: mkdir %s: %w", filepath.Dir(dbPath), err)
+		return fmt.Errorf("sync kev: mkdir: %w", err)
 	}
 
 	s, err := store.Open(dbPath)
@@ -93,6 +106,37 @@ func syncKEV(dbPath string) error {
 	return nil
 }
 
+func syncNVDRemote(dbPath string, days int) error {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+		return fmt.Errorf("sync nvd: mkdir: %w", err)
+	}
+
+	s, err := store.Open(dbPath)
+	if err != nil {
+		return fmt.Errorf("sync nvd: open store: %w", err)
+	}
+	defer s.Close()
+
+	client := nvd.NewClient(nil)
+
+	end := time.Now().UTC().Format("2006-01-02T15:04:05.000")
+	start := time.Now().UTC().AddDate(0, 0, -days).Format("2006-01-02T15:04:05.000")
+
+	n, err := syncpkg.SyncNVD(context.Background(), syncpkg.NVDOptions{
+		Source:       client,
+		Store:        s,
+		LastModStart: start,
+		LastModEnd:   end,
+		ProgressFreq: 500,
+	})
+	if err != nil {
+		return fmt.Errorf("sync nvd: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "sync nvd: %d records written to %s\n", n, dbPath)
+	return nil
+}
+
 func parseSyncArgs(args []string) (syncFlags, error) {
 	var f syncFlags
 
@@ -116,6 +160,12 @@ func parseSyncArgs(args []string) (syncFlags, error) {
 		switch key {
 		case "--db":
 			f.DBPath = value
+		case "--days":
+			n, err := strconv.Atoi(value)
+			if err != nil || n <= 0 {
+				return f, fmt.Errorf("sync: --days requires a positive integer")
+			}
+			f.Days = n
 		default:
 			return f, fmt.Errorf("sync: unknown flag %q", key)
 		}
@@ -138,16 +188,19 @@ Download and persist vulnerability data to the local SQLite store.
 
 Targets:
   kev                  Sync the CISA Known Exploited Vulnerabilities catalog
+  nvd                  Sync recent CVE records from the NVD API 2.0
   all                  Sync all available targets
 
 Flags:
   --db <path>          Path to SQLite database (default: ~/.cevrixa/cevrixa.db)
+  --days <n>           For NVD: how many days back to fetch (default: 7)
   -h, --help           Show this help
 
 Examples:
   cevrixa sync kev
-  cevrixa sync kev --db ./test.db
+  cevrixa sync nvd --days 30
+  cevrixa sync all --db ./test.db
 
-Note: currently reads from embedded fixtures. Live source fetching is
-planned for a later milestone.`)
+Note: kev reads from embedded fixtures. nvd fetches from the live NVD API
+and requires network access.`)
 }

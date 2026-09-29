@@ -108,3 +108,22 @@ func TestRunSyncKEVEndToEnd(t *testing.T) {
 		t.Fatal("expected at least 1 KEV entry")
 	}
 }
+func TestParseSyncArgsDays(t *testing.T) {
+	got, err := parseSyncArgs([]string{"--days", "30"})
+	if err != nil {
+		t.Fatalf("parseSyncArgs: %v", err)
+	}
+	if got.Days != 30 {
+		t.Fatalf("Days = %d", got.Days)
+	}
+}
+
+func TestParseSyncArgsDaysInvalid(t *testing.T) {
+	for _, bad := range []string{"0", "-5", "abc"} {
+		t.Run(bad, func(t *testing.T) {
+			if _, err := parseSyncArgs([]string{"--days", bad}); err == nil {
+				t.Fatalf("expected error for --days %q", bad)
+			}
+		})
+	}
+}

@@ -8,8 +8,8 @@ func mapVulnerability(cve apiCVE) domain.Vulnerability {
 		Source:           "nvd",
 		SourceIdentifier: cve.SourceIdentifier,
 		Status:           cve.VulnStatus,
-		Published:        cve.Published,
-		Modified:         cve.LastModified,
+		Published:        cve.Published.Time,
+		Modified:         cve.LastModified.Time,
 		Risk:             mapRisk(cve.Metrics),
 	}
 
