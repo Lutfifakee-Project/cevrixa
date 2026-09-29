@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"runtime"
 )
 
@@ -22,7 +23,7 @@ func runVersion(args []string) error {
 		}
 	}
 
-	fmt.Printf("cevrixa %s\n", Version)
+	writeBanner(os.Stdout)
 	fmt.Printf("  commit:  %s\n", Commit)
 	fmt.Printf("  built:   %s\n", Date)
 	fmt.Printf("  go:      %s\n", runtime.Version())

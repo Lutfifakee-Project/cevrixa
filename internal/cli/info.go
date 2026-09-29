@@ -8,10 +8,30 @@ import (
 )
 
 func runInfo(args []string) error {
-	for _, a := range args {
-		if a == "-h" || a == "--help" {
-			fmt.Println("Usage: cevrixa info\n\nShow environment and data status.")
+	dbPath := ""
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		if arg == "-h" || arg == "--help" {
+			fmt.Println("Usage: cevrixa info [--db <path>]\n\nShow environment and data status.")
 			return nil
+		}
+		if arg == "--db" {
+			if i+1 >= len(args) {
+				return fmt.Errorf("info: --db requires a value")
+			}
+			dbPath = args[i+1]
+			i++
+			continue
+		}
+		return fmt.Errorf("info: unknown argument %q", arg)
+	}
+
+	if dbPath == "" {
+		p, err := defaultDBPath()
+		if err == nil {
+			dbPath = p
 		}
 	}
 
@@ -32,7 +52,6 @@ func runInfo(args []string) error {
 	fmt.Printf("  vulnerabilities: %d\n", engine.EmbeddedFixtureCount())
 	fmt.Println()
 
-	dbPath, _ := defaultDBPath()
 	fmt.Println("Store")
 	fmt.Printf("  path: %s\n", dbPath)
 	if s, err := openStoreIfDB(dbPath); err == nil && s != nil {

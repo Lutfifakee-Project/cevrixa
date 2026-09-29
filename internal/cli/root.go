@@ -3,13 +3,14 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"os"
 )
 
 var errNotImplemented = errors.New("not implemented in this milestone")
 
-// Run dispatches a command-line invocation to the appropriate command.
 func Run(args []string) error {
 	if len(args) == 0 {
+		writeBanner(os.Stdout)
 		printUsage()
 		return nil
 	}
@@ -32,6 +33,7 @@ func Run(args []string) error {
 	case "doctor":
 		return runDoctor(args[1:])
 	case "help", "-h", "--help":
+		writeBanner(os.Stdout)
 		printUsage()
 		return nil
 	default:
@@ -41,9 +43,7 @@ func Run(args []string) error {
 }
 
 func printUsage() {
-	fmt.Println(`cevrixa — evidence-first vulnerability applicability engine
-
-Usage:
+	fmt.Println(`Usage:
   cevrixa <command> [flags]
 
 Commands:

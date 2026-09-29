@@ -1,28 +1,35 @@
-BINARY := cevrixa
-PKG := ./cmd/cevrixa
-VERSION ?= dev
-COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
-DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+BINARY  := cevrixa
+PKG     := ./cmd/cevrixa
+VERSION ?= v0.1.0
+COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
+DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 LDFLAGS := -X 'github.com/Lutfifakee-Project/cevrixa/internal/cli.Version=$(VERSION)' \
            -X 'github.com/Lutfifakee-Project/cevrixa/internal/cli.Commit=$(COMMIT)' \
            -X 'github.com/Lutfifakee-Project/cevrixa/internal/cli.Date=$(DATE)'
 
-.PHONY: build test vet fmt check clean
+.PHONY: build test test-race vet fmt fmt-check check clean
 
 build:
 	go build -ldflags "$(LDFLAGS)" -o bin/$(BINARY) $(PKG)
 
 test:
-	go test ./...
+	go test ./... -count=1
+
+test-race:
+	go test -race ./... -count=1
 
 vet:
 	go vet ./...
 
 fmt:
-	gofmt -w .
+	gofmt -s -w .
 
-check: fmt test vet build
+fmt-check:
+	@out=$$(gofmt -l .); \
+	if [ -n "$$out" ]; then echo "not gofmt-clean:"; echo "$$out"; exit 1; fi
+
+check: fmt-check vet test
 
 clean:
 	rm -rf bin

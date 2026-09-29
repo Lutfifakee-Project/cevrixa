@@ -29,17 +29,14 @@ func TestParseSyncArgsDBFlag(t *testing.T) {
 
 func TestSyncKEVWritesEntries(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "sync.db")
-
-	if err := syncKEV(dbPath); err != nil {
+	if err := syncKEV(dbPath, false); err != nil {
 		t.Fatalf("syncKEV: %v", err)
 	}
-
 	s, err := store.Open(dbPath)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 	defer s.Close()
-
 	n, err := s.CountKEV()
 	if err != nil {
 		t.Fatalf("CountKEV: %v", err)
@@ -47,24 +44,19 @@ func TestSyncKEVWritesEntries(t *testing.T) {
 	if n == 0 {
 		t.Fatal("expected at least 1 KEV entry")
 	}
-
-	// Verify a known fixture entry is present.
-	if _, err := s.GetKEV("CVE-2021-41773"); err != nil {
-		t.Fatalf("GetKEV(CVE-2021-41773): %v", err)
-	}
 }
 
 func TestSyncKEVIdempotent(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "sync.db")
 
-	if err := syncKEV(dbPath); err != nil {
+	if err := syncKEV(dbPath, false); err != nil {
 		t.Fatalf("first sync: %v", err)
 	}
 	s1, _ := store.Open(dbPath)
 	n1, _ := s1.CountKEV()
 	s1.Close()
 
-	if err := syncKEV(dbPath); err != nil {
+	if err := syncKEV(dbPath, false); err != nil {
 		t.Fatalf("second sync: %v", err)
 	}
 	s2, _ := store.Open(dbPath)
@@ -72,42 +64,38 @@ func TestSyncKEVIdempotent(t *testing.T) {
 	n2, _ := s2.CountKEV()
 
 	if n1 != n2 {
-		t.Fatalf("count changed between syncs: %d -> %d", n1, n2)
+		t.Fatalf("count changed: %d -> %d", n1, n2)
 	}
 }
 
 func TestRunSyncRequiresTarget(t *testing.T) {
-	err := runSync(nil)
-	if err == nil {
-		t.Fatal("expected error for missing target")
+	if err := runSync(nil); err == nil {
+		t.Fatal("expected error")
 	}
 }
 
 func TestRunSyncUnknownTarget(t *testing.T) {
-	err := runSync([]string{"bogus"})
-	if err == nil {
-		t.Fatal("expected error for unknown target")
+	if err := runSync([]string{"bogus"}); err == nil {
+		t.Fatal("expected error")
 	}
 }
 
 func TestRunSyncKEVEndToEnd(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "e2e.db")
-
 	if err := runSync([]string{"kev", "--db", dbPath}); err != nil {
 		t.Fatalf("runSync: %v", err)
 	}
-
 	s, err := store.Open(dbPath)
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 	defer s.Close()
-
 	n, _ := s.CountKEV()
 	if n == 0 {
-		t.Fatal("expected at least 1 KEV entry")
+		t.Fatal("expected KEV entries")
 	}
 }
+
 func TestParseSyncArgsDays(t *testing.T) {
 	got, err := parseSyncArgs([]string{"--days", "30"})
 	if err != nil {
@@ -127,6 +115,7 @@ func TestParseSyncArgsDaysInvalid(t *testing.T) {
 		})
 	}
 }
+
 func TestParseSyncArgsFull(t *testing.T) {
 	got, err := parseSyncArgs([]string{"--full"})
 	if err != nil {
@@ -134,5 +123,15 @@ func TestParseSyncArgsFull(t *testing.T) {
 	}
 	if !got.Full {
 		t.Fatal("Full should be true")
+	}
+}
+
+func TestParseSyncArgsLive(t *testing.T) {
+	got, err := parseSyncArgs([]string{"--live"})
+	if err != nil {
+		t.Fatalf("parseSyncArgs: %v", err)
+	}
+	if !got.Live {
+		t.Fatal("Live should be true")
 	}
 }

@@ -39,7 +39,7 @@ func TestLoadKEVFromEmbedded(t *testing.T) {
 
 func TestLoadKEVFromDB(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
-	if err := syncKEV(dbPath); err != nil {
+	if err := syncKEV(dbPath, false); err != nil {
 		t.Fatalf("syncKEV: %v", err)
 	}
 
@@ -56,7 +56,6 @@ func TestLoadKEVFromDB(t *testing.T) {
 }
 
 func TestLoadKEVFromEmptyDB(t *testing.T) {
-	// Create an empty DB with schema but no data.
 	dbPath := filepath.Join(t.TempDir(), "empty.db")
 	s, err := store.Open(dbPath)
 	if err != nil {
@@ -71,7 +70,6 @@ func TestLoadKEVFromEmptyDB(t *testing.T) {
 }
 
 func TestLoadKEVFallsBackWhenDBMissing(t *testing.T) {
-	// Non-existent DB path → falls back to embedded.
 	missing := filepath.Join(t.TempDir(), "does-not-exist.db")
 	entries, src, err := loadKEV(true, missing)
 	if err != nil {
@@ -107,7 +105,7 @@ func TestOpenStoreIfDBMissing(t *testing.T) {
 
 func TestOpenStoreIfDBExisting(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "x.db")
-	if err := syncKEV(dbPath); err != nil {
+	if err := syncKEV(dbPath, false); err != nil {
 		t.Fatalf("syncKEV: %v", err)
 	}
 	s, err := openStoreIfDB(dbPath)
