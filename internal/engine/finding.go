@@ -10,7 +10,7 @@ func buildFinding(targetCPE domain.CPE, v domain.Vulnerability, mr matcher.Resul
 	f := domain.Finding{
 		VulnerabilityID: v.ID,
 		Status:          domain.FindingStatusAffected,
-		Confidence:      domain.ConfidenceStrong,
+		Confidence:      computeConfidence(mr),
 		Applicability: domain.Applicability{
 			Matched:   mr.Matched,
 			Range:     mr.Range,

@@ -89,3 +89,19 @@ func TestEmbeddedFixturesLoadable(t *testing.T) {
 		}
 	}
 }
+func TestDetectConfidenceIsStrongForRangeMatch(t *testing.T) {
+	target := domain.Target{Product: "Apache HTTP Server", Version: "2.4.49"}
+	report, err := Detect(target, Options{})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	if len(report.Findings) == 0 {
+		t.Fatal("expected at least 1 finding")
+	}
+	for _, f := range report.Findings {
+		if f.Confidence != domain.ConfidenceStrong {
+			t.Fatalf("finding %s confidence = %q, want STRONG (range match)",
+				f.VulnerabilityID, f.Confidence)
+		}
+	}
+}

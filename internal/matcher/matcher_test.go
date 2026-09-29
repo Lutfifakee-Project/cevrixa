@@ -200,3 +200,59 @@ func TestMatchCPEBoundaryExclusive(t *testing.T) {
 		t.Fatalf("exclusive lower boundary should not match")
 	}
 }
+func TestMatchCPEClassifiesMode(t *testing.T) {
+	cases := []struct {
+		name string
+		m    domain.CPEMatch
+		want string
+	}{
+		{
+			name: "wildcard",
+			m:    domain.CPEMatch{Vulnerable: true, Criteria: "cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*"},
+			want: "wildcard",
+		},
+		{
+			name: "range both bounds",
+			m: domain.CPEMatch{
+				Vulnerable:       true,
+				Criteria:         "cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*",
+				VersionStart:     "2.4.0",
+				VersionStartMode: domain.BoundModeIncluding,
+				VersionEnd:       "2.4.51",
+				VersionEndMode:   domain.BoundModeExcluding,
+			},
+			want: "range",
+		},
+		{
+			name: "partial lower only",
+			m: domain.CPEMatch{
+				Vulnerable:       true,
+				Criteria:         "cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*",
+				VersionStart:     "2.4.0",
+				VersionStartMode: domain.BoundModeIncluding,
+			},
+			want: "partial",
+		},
+		{
+			name: "exact",
+			m: domain.CPEMatch{
+				Vulnerable:       true,
+				Criteria:         "cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*",
+				VersionStart:     "2.4.49",
+				VersionStartMode: domain.BoundModeIncluding,
+				VersionEnd:       "2.4.49",
+				VersionEndMode:   domain.BoundModeIncluding,
+			},
+			want: "exact",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := classifyMode(tc.m)
+			if got != tc.want {
+				t.Fatalf("classifyMode = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}

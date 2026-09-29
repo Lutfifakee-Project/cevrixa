@@ -48,22 +48,13 @@ func matchSingle(m domain.CPEMatch, target domain.CPE, v version.Version) (Resul
 	}
 
 	matched := rng.Contains(v)
-	if !matched {
-		return Result{
-			Matched:  false,
-			Criteria: m.Criteria,
-			Range:    formatRange(m),
-			Fixed:    fixedVersion(m),
-			Mode:     "range",
-		}, true
-	}
 
 	return Result{
-		Matched:  true,
+		Matched:  matched,
 		Criteria: m.Criteria,
 		Range:    formatRange(m),
 		Fixed:    fixedVersion(m),
-		Mode:     "range",
+		Mode:     classifyMode(m),
 	}, true
 }
 

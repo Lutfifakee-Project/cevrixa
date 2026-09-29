@@ -62,3 +62,21 @@ func fixedVersion(m domain.CPEMatch) string {
 	}
 	return ""
 }
+
+func classifyMode(m domain.CPEMatch) string {
+	hasStart := m.VersionStart != ""
+	hasEnd := m.VersionEnd != ""
+
+	if !hasStart && !hasEnd {
+		return "wildcard"
+	}
+	if hasStart && hasEnd {
+		if m.VersionStart == m.VersionEnd &&
+			m.VersionStartMode == domain.BoundModeIncluding &&
+			m.VersionEndMode == domain.BoundModeIncluding {
+			return "exact"
+		}
+		return "range"
+	}
+	return "partial"
+}
