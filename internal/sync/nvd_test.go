@@ -180,3 +180,28 @@ func TestSyncNVDRequiresSourceAndStore(t *testing.T) {
 		t.Fatal("expected error for missing options")
 	}
 }
+func TestBackfillNVDSingleWindow(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(nvdFixture("CVE-BF-001", "CVE-BF-002")))
+	}))
+	defer server.Close()
+
+	client := nvd.NewClient(server.Client())
+	client.BaseURL = server.URL
+
+	s := openTestStore(t)
+
+	n, err := BackfillNVD(context.Background(), NVDBackfillOptions{
+		Source:      client,
+		Store:       s,
+		WindowDays:  120,
+		EarliestISO: "2024-01-01T00:00:00.000",
+	})
+	if err != nil {
+		t.Fatalf("BackfillNVD: %v", err)
+	}
+	if n < 2 {
+		t.Fatalf("expected >= 2 records, got %d", n)
+	}
+}

@@ -20,6 +20,7 @@ type syncFlags struct {
 	Target string
 	DBPath string
 	Days   int
+	Full   bool
 }
 
 func runSync(args []string) error {
@@ -59,6 +60,9 @@ func runSync(args []string) error {
 	case "kev":
 		return syncKEV(flags.DBPath)
 	case "nvd":
+		if flags.Full {
+			return syncNVDFull(flags.DBPath)
+		}
 		return syncNVDRemote(flags.DBPath, flags.Days)
 	case "all":
 		if err := syncKEV(flags.DBPath); err != nil {
@@ -148,6 +152,10 @@ func parseSyncArgs(args []string) (syncFlags, error) {
 			printSyncUsage()
 			return syncFlags{}, errHelpRequested
 		}
+		if arg == "--full" {
+			f.Full = true
+			continue
+		}
 
 		key, value, hasInlineValue := splitFlag(arg)
 		if !hasInlineValue {
@@ -174,6 +182,35 @@ func parseSyncArgs(args []string) (syncFlags, error) {
 	return f, nil
 }
 
+func syncNVDFull(dbPath string) error {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+		return fmt.Errorf("sync nvd full: mkdir: %w", err)
+	}
+
+	s, err := store.Open(dbPath)
+	if err != nil {
+		return fmt.Errorf("sync nvd full: open store: %w", err)
+	}
+	defer s.Close()
+
+	client := nvd.NewClient(&http.Client{Timeout: 180 * time.Second})
+
+	fmt.Fprintln(os.Stderr, "sync nvd full: this will fetch full NVD history (~250k CVE). It may take 1-2 hours without an API key.")
+	fmt.Fprintln(os.Stderr, "sync nvd full: press Ctrl+C to cancel.")
+
+	n, err := syncpkg.BackfillNVD(context.Background(), syncpkg.NVDBackfillOptions{
+		Source:       client,
+		Store:        s,
+		ProgressFreq: 1,
+	})
+	if err != nil {
+		return fmt.Errorf("sync nvd full: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "sync nvd full: %d records written to %s\n", n, dbPath)
+	return nil
+}
+
 func defaultDBPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -195,11 +232,13 @@ Targets:
 Flags:
   --db <path>          Path to SQLite database (default: ~/.cevrixa/cevrixa.db)
   --days <n>           For NVD: how many days back to fetch (default: 7)
+  --full               For NVD: fetch full history (slow, ~1-2h without API key)
   -h, --help           Show this help
 
 Examples:
   cevrixa sync kev
   cevrixa sync nvd --days 30
+  cevrixa sync nvd --full
   cevrixa sync all --db ./test.db
 
 Note: kev reads from embedded fixtures. nvd fetches from the live NVD API

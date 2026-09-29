@@ -127,3 +127,12 @@ func TestParseSyncArgsDaysInvalid(t *testing.T) {
 		})
 	}
 }
+func TestParseSyncArgsFull(t *testing.T) {
+	got, err := parseSyncArgs([]string{"--full"})
+	if err != nil {
+		t.Fatalf("parseSyncArgs: %v", err)
+	}
+	if !got.Full {
+		t.Fatal("Full should be true")
+	}
+}

@@ -119,3 +119,88 @@ func resolveDateRange(opts NVDOptions) (string, string, error) {
 	}
 	return start, end, nil
 }
+
+type NVDBackfillOptions struct {
+	Source       *nvd.Client
+	Store        *store.Store
+	PageLimit    int
+	WindowDays   int    // NVD allows max 120
+	EarliestISO  string // stop when end < this; default "2002-01-01T00:00:00.000"
+	ProgressFreq int
+}
+
+func (o *NVDBackfillOptions) applyDefaults() {
+	if o.PageLimit <= 0 {
+		o.PageLimit = 2000
+	}
+	if o.WindowDays <= 0 || o.WindowDays > 120 {
+		o.WindowDays = 120
+	}
+	if o.EarliestISO == "" {
+		o.EarliestISO = "2002-01-01T00:00:00.000"
+	}
+}
+
+// BackfillNVD fetches the full NVD history in 120-day windows, oldest
+// first. Returns total records written.
+func BackfillNVD(ctx context.Context, opts NVDBackfillOptions) (int, error) {
+	opts.applyDefaults()
+
+	if opts.Source == nil {
+		return 0, fmt.Errorf("sync nvd backfill: source client required")
+	}
+	if opts.Store == nil {
+		return 0, fmt.Errorf("sync nvd backfill: store required")
+	}
+
+	const layout = "2006-01-02T15:04:05.000"
+
+	end, err := time.Parse(layout, "2026-12-31T00:00:00.000")
+	if err != nil {
+		return 0, fmt.Errorf("parse default end: %w", err)
+	}
+	earliest, err := time.Parse(layout, opts.EarliestISO)
+	if err != nil {
+		return 0, fmt.Errorf("parse earliest: %w", err)
+	}
+
+	total := 0
+	windowNum := 0
+
+	for end.After(earliest) {
+		start := end.AddDate(0, 0, -opts.WindowDays)
+		if start.Before(earliest) {
+			start = earliest
+		}
+
+		windowNum++
+		startISO := start.Format(layout)
+		endISO := end.Format(layout)
+
+		if opts.ProgressFreq > 0 {
+			fmt.Fprintf(os.Stderr, "sync nvd backfill: window %d [%s .. %s]\n",
+				windowNum, startISO, endISO)
+		}
+
+		n, err := SyncNVD(ctx, NVDOptions{
+			Source:       opts.Source,
+			Store:        opts.Store,
+			PageLimit:    opts.PageLimit,
+			LastModStart: startISO,
+			LastModEnd:   endISO,
+		})
+		if err != nil {
+			return total, fmt.Errorf("window %d [%s..%s]: %w", windowNum, startISO, endISO, err)
+		}
+		total += n
+
+		if opts.ProgressFreq > 0 {
+			fmt.Fprintf(os.Stderr, "sync nvd backfill: window %d done, %d records (total %d)\n",
+				windowNum, n, total)
+		}
+
+		end = start
+	}
+
+	return total, nil
+}
