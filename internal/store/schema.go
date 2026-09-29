@@ -27,4 +27,12 @@ var migrations = map[int][]string{
 			known_ransomware    TEXT NOT NULL DEFAULT ''
 		)`,
 	},
+	2: {
+		`CREATE TABLE IF NOT EXISTS sync_metadata (
+			source          TEXT PRIMARY KEY,
+			last_sync_at    INTEGER NOT NULL,
+			last_sync_iso   TEXT NOT NULL,
+			records_synced  INTEGER NOT NULL DEFAULT 0
+		)`,
+	},
 }

@@ -55,6 +55,17 @@ func (c *Client) List(ctx context.Context, query source.Query) (source.Result, e
 	if query.ResultsLimit > 0 {
 		q.Set("resultsPerPage", strconv.Itoa(query.ResultsLimit))
 	}
+	if query.LastModStart != "" || query.LastModEnd != "" {
+		if query.ID != "" {
+			return source.Result{}, fmt.Errorf("nvd: lastModStartDate/lastModEndDate cannot be combined with cveId")
+		}
+		if query.LastModStart == "" || query.LastModEnd == "" {
+			return source.Result{}, fmt.Errorf("nvd: lastModStartDate and lastModEndDate must both be provided")
+		}
+		q.Set("lastModStartDate", query.LastModStart)
+		q.Set("lastModEndDate", query.LastModEnd)
+	}
+
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)

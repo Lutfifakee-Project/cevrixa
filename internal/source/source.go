@@ -6,13 +6,11 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 )
 
-// VulnerabilitySource retrieves canonical vulnerability records from an upstream source.
 type VulnerabilitySource interface {
 	Name() string
 	List(ctx context.Context, query Query) (Result, error)
 }
 
-// Query describes a provider-neutral vulnerability lookup.
 type Query struct {
 	ID           string
 	PackageName  string
@@ -23,9 +21,14 @@ type Query struct {
 	PageToken    string
 	StartIndex   int
 	ResultsLimit int
+
+	// Date range filters for incremental sync (NVD).
+	// Format: ISO-8601, e.g. "2024-01-01T00:00:00.000".
+	// When both are set, they must span at most 120 days (NVD limit).
+	LastModStart string
+	LastModEnd   string
 }
 
-// Result contains a page of canonical records and pagination metadata.
 type Result struct {
 	Vulnerabilities []domain.Vulnerability
 	TotalResults    int

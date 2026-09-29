@@ -74,3 +74,49 @@ func TestClientMapsResponse(t *testing.T) {
 		t.Fatalf("unexpected range: %+v", match)
 	}
 }
+func TestClientWithDateRange(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("lastModStartDate"); got != "2024-01-01T00:00:00.000" {
+			t.Fatalf("lastModStartDate = %q", got)
+		}
+		if got := r.URL.Query().Get("lastModEndDate"); got != "2024-01-02T00:00:00.000" {
+			t.Fatalf("lastModEndDate = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"resultsPerPage":0,"startIndex":0,"totalResults":0,"vulnerabilities":[]}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.Client())
+	client.BaseURL = server.URL
+
+	_, err := client.List(context.Background(), source.Query{
+		LastModStart: "2024-01-01T00:00:00.000",
+		LastModEnd:   "2024-01-02T00:00:00.000",
+	})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+}
+
+func TestClientRejectsDateRangeWithCVEID(t *testing.T) {
+	client := NewClient(nil)
+	_, err := client.List(context.Background(), source.Query{
+		ID:           "CVE-2024-1234",
+		LastModStart: "2024-01-01T00:00:00.000",
+		LastModEnd:   "2024-01-02T00:00:00.000",
+	})
+	if err == nil {
+		t.Fatal("expected error for cveId + date range")
+	}
+}
+
+func TestClientRejectsPartialDateRange(t *testing.T) {
+	client := NewClient(nil)
+	_, err := client.List(context.Background(), source.Query{
+		LastModStart: "2024-01-01T00:00:00.000",
+	})
+	if err == nil {
+		t.Fatal("expected error for partial date range")
+	}
+}
