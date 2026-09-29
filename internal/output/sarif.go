@@ -66,62 +66,11 @@ type sarifArtifactLocation struct {
 }
 
 func RenderSARIF(w io.Writer, r domain.Report, toolVersion string) error {
-	driver := sarifDriver{
-		Name:           "Cevrixa",
-		Version:        toolVersion,
-		InformationURI: "https://github.com/Lutfifakee-Project/cevrixa",
-	}
-
-	seenRules := map[string]bool{}
-	var rules []sarifRule
-	var results []sarifResult
-
-	for _, f := range r.Findings {
-		if !seenRules[f.VulnerabilityID] {
-			seenRules[f.VulnerabilityID] = true
-			rules = append(rules, sarifRule{
-				ID:               f.VulnerabilityID,
-				Name:             f.VulnerabilityID,
-				ShortDescription: sarifMessage{Text: "Vulnerability affecting target"},
-				Properties: map[string]any{
-					"status":     string(f.Status),
-					"confidence": string(f.Confidence),
-				},
-			})
-		}
-
-		results = append(results, sarifResult{
-			RuleID: f.VulnerabilityID,
-			Level:  levelFromStatus(f),
-			Message: sarifMessage{
-				Text: buildSARIFMessage(r.Target, f),
-			},
-			Locations: []sarifLocation{
-				{
-					PhysicalLocation: sarifPhysicalLocation{
-						ArtifactLocation: sarifArtifactLocation{
-							URI: artifactURI(r.Target),
-						},
-					},
-				},
-			},
-			Properties: buildResultProperties(f),
-		})
-	}
-
-	driver.Rules = rules
-
 	log := sarifLog{
 		Schema:  sarifSchema,
 		Version: sarifVersion,
-		Runs: []sarifRun{
-			{
-				Tool:    sarifTool{Driver: driver},
-				Results: results,
-			},
-		},
+		Runs:    []sarifRun{buildRun(r, toolVersion)},
 	}
-
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	enc.SetEscapeHTML(false)
@@ -190,4 +139,71 @@ func buildResultProperties(f domain.Finding) map[string]any {
 		}
 	}
 	return props
+}
+
+// RenderSARIFMulti produces a single SARIF log with one run per report.
+func RenderSARIFMulti(w io.Writer, reports []domain.Report, toolVersion string) error {
+	log := sarifLog{
+		Schema:  sarifSchema,
+		Version: sarifVersion,
+		Runs:    []sarifRun{},
+	}
+	for _, r := range reports {
+		run := buildRun(r, toolVersion)
+		log.Runs = append(log.Runs, run)
+	}
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	enc.SetEscapeHTML(false)
+	return enc.Encode(log)
+}
+
+func buildRun(r domain.Report, toolVersion string) sarifRun {
+	driver := sarifDriver{
+		Name:           "Cevrixa",
+		Version:        toolVersion,
+		InformationURI: "https://github.com/Lutfifakee-Project/cevrixa",
+	}
+
+	seenRules := map[string]bool{}
+	var rules []sarifRule
+	var results []sarifResult
+
+	for _, f := range r.Findings {
+		if !seenRules[f.VulnerabilityID] {
+			seenRules[f.VulnerabilityID] = true
+			rules = append(rules, sarifRule{
+				ID:               f.VulnerabilityID,
+				Name:             f.VulnerabilityID,
+				ShortDescription: sarifMessage{Text: "Vulnerability affecting target"},
+				Properties: map[string]any{
+					"status":     string(f.Status),
+					"confidence": string(f.Confidence),
+				},
+			})
+		}
+		results = append(results, sarifResult{
+			RuleID: f.VulnerabilityID,
+			Level:  levelFromStatus(f),
+			Message: sarifMessage{
+				Text: buildSARIFMessage(r.Target, f),
+			},
+			Locations: []sarifLocation{
+				{
+					PhysicalLocation: sarifPhysicalLocation{
+						ArtifactLocation: sarifArtifactLocation{
+							URI: artifactURI(r.Target),
+						},
+					},
+				},
+			},
+			Properties: buildResultProperties(f),
+		})
+	}
+
+	driver.Rules = rules
+	return sarifRun{
+		Tool:    sarifTool{Driver: driver},
+		Results: results,
+	}
 }

@@ -17,6 +17,8 @@ func Run(args []string) error {
 		return runVersion(args[1:])
 	case "detect":
 		return runDetect(args[1:])
+	case "scan":
+		return runScan(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -33,7 +35,8 @@ Usage:
   cevrixa <command> [flags]
 
 Commands:
-  detect     Detect whether a target is affected by known vulnerabilities
+  detect     Detect whether a single target is affected
+  scan       Read multiple targets from a file or stdin
   version    Print version information
   help       Show this help message
 
