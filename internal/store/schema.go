@@ -1,10 +1,5 @@
 package store
 
-// migrations maps a schema version to the DDL statements that bring the
-// database from version (key-1) to (key). Migrations are applied in order.
-//
-// Never edit an existing migration. To change the schema, add a new
-// version with new statements.
 var migrations = map[int][]string{
 	1: {
 		`CREATE TABLE IF NOT EXISTS vulnerabilities (
@@ -34,5 +29,15 @@ var migrations = map[int][]string{
 			last_sync_iso   TEXT NOT NULL,
 			records_synced  INTEGER NOT NULL DEFAULT 0
 		)`,
+	},
+	3: {
+		`CREATE TABLE IF NOT EXISTS enrichments (
+			vulnerability_id TEXT NOT NULL,
+			source           TEXT NOT NULL,
+			payload          BLOB NOT NULL,
+			updated_at       INTEGER NOT NULL,
+			PRIMARY KEY (vulnerability_id, source)
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_enrichments_vuln ON enrichments(vulnerability_id)`,
 	},
 }

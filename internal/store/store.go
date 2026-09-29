@@ -9,7 +9,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 type Store struct {
 	db   *sql.DB
