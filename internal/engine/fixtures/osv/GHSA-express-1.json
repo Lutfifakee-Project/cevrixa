@@ -1,0 +1,22 @@
+{
+  "id": "GHSA-express-1",
+  "source": "osv",
+  "summary": "Express.js open redirect in res.location",
+  "aliases": ["CVE-2024-29041"],
+  "package_applicability": [
+    {
+      "name": "express",
+      "ecosystem": "npm",
+      "purl": "pkg:npm/express",
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {"introduced": "4.0.0"},
+            {"last_affected": "4.19.1"}
+          ]
+        }
+      ]
+    }
+  ]
+}

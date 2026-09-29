@@ -1,0 +1,22 @@
+{
+  "id": "GHSA-go-1",
+  "source": "osv",
+  "summary": "Synthetic Go fixture for gin",
+  "aliases": [],
+  "package_applicability": [
+    {
+      "name": "github.com/gin-gonic/gin",
+      "ecosystem": "Go",
+      "purl": "pkg:golang/github.com/gin-gonic/gin",
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {"introduced": "0"},
+            {"fixed": "v1.10.0"}
+          ]
+        }
+      ]
+    }
+  ]
+}

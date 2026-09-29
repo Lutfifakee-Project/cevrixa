@@ -2,8 +2,6 @@ package engine
 
 import "strings"
 
-// normalizeEcosystem maps a PURL type to the OSV ecosystem name.
-// Returns empty string if the ecosystem is not supported.
 func normalizeEcosystem(purlType string) string {
 	switch strings.ToLower(purlType) {
 	case "pypi":
@@ -24,5 +22,25 @@ func normalizeEcosystem(purlType string) string {
 		return "NuGet"
 	default:
 		return ""
+	}
+}
+
+func matchName(ecosystem, purlNamespace, purlName, osvName string) bool {
+	switch ecosystem {
+	case "PyPI":
+		return strings.EqualFold(purlName, osvName)
+	case "Go":
+		full := purlName
+		if purlNamespace != "" {
+			full = purlNamespace + "/" + purlName
+		}
+		return full == osvName
+	case "Maven":
+		if purlNamespace != "" {
+			return purlNamespace+":"+purlName == osvName
+		}
+		return purlName == osvName
+	default:
+		return purlName == osvName
 	}
 }

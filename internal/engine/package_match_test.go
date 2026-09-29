@@ -29,6 +29,29 @@ func djangoVuln() domain.Vulnerability {
 	}
 }
 
+func expressLastAffectedVuln() domain.Vulnerability {
+	return domain.Vulnerability{
+		ID:     "GHSA-express-1",
+		Source: "osv",
+		PackageApplicability: []domain.PackageApplicability{
+			{
+				Name:      "express",
+				Ecosystem: "npm",
+				PURL:      "pkg:npm/express",
+				Ranges: []domain.PackageRange{
+					{
+						Type: "ECOSYSTEM",
+						Events: []domain.PackageRangeEvent{
+							{Introduced: "4.0.0"},
+							{LastAffected: "4.19.1"},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func TestMatchPackageInRange(t *testing.T) {
 	purl, _ := domain.ParsePURL("pkg:pypi/django@4.2.0")
 	got, ok := matchPackage(purl, djangoVuln())
@@ -40,6 +63,9 @@ func TestMatchPackageInRange(t *testing.T) {
 	}
 	if got.Fixed != "4.2.10" {
 		t.Fatalf("Fixed = %q", got.Fixed)
+	}
+	if got.Mode != "range" {
+		t.Fatalf("Mode = %q, want range (introduced=0 + fixed)", got.Mode)
 	}
 }
 
@@ -83,5 +109,128 @@ func TestMatchPackageNoApplicability(t *testing.T) {
 	_, ok := matchPackage(purl, domain.Vulnerability{})
 	if ok {
 		t.Fatal("expected no match for empty vuln")
+	}
+}
+
+func TestMatchPackagePyPICaseInsensitive(t *testing.T) {
+	purl, err := domain.ParsePURL("pkg:pypi/Django@4.2.0")
+	if err != nil {
+		t.Fatalf("ParsePURL: %v", err)
+	}
+	got, ok := matchPackage(purl, djangoVuln())
+	if !ok || !got.Matched {
+		t.Fatalf("PyPI should match case-insensitively, got ok=%v res=%+v", ok, got)
+	}
+}
+
+func TestMatchPackageLastAffectedInclusive(t *testing.T) {
+	purl, _ := domain.ParsePURL("pkg:npm/express@4.19.1")
+	got, ok := matchPackage(purl, expressLastAffectedVuln())
+	if !ok || !got.Matched {
+		t.Fatalf("4.19.1 should match (last_affected inclusive), got ok=%v res=%+v", ok, got)
+	}
+	if got.Fixed != "" {
+		t.Fatalf("Fixed should be empty for last_affected, got %q", got.Fixed)
+	}
+}
+
+func TestMatchPackageLastAffectedAboveBoundary(t *testing.T) {
+	purl, _ := domain.ParsePURL("pkg:npm/express@4.19.2")
+	got, ok := matchPackage(purl, expressLastAffectedVuln())
+	if !ok {
+		t.Fatal("expected match attempt")
+	}
+	if got.Matched {
+		t.Fatalf("4.19.2 should not match, got %+v", got)
+	}
+}
+
+func TestMatchPackageLastAffectedBelowIntroduced(t *testing.T) {
+	purl, _ := domain.ParsePURL("pkg:npm/express@3.0.0")
+	got, ok := matchPackage(purl, expressLastAffectedVuln())
+	if !ok {
+		t.Fatal("expected match attempt")
+	}
+	if got.Matched {
+		t.Fatalf("3.0.0 should not match (introduced=4.0.0), got %+v", got)
+	}
+}
+
+func TestMatchPackageGo(t *testing.T) {
+	purl, _ := domain.ParsePURL("pkg:golang/github.com/gin-gonic/gin@v1.9.0")
+	vuln := domain.Vulnerability{
+		ID:     "GHSA-go-1",
+		Source: "osv",
+		PackageApplicability: []domain.PackageApplicability{
+			{
+				Name:      "github.com/gin-gonic/gin",
+				Ecosystem: "Go",
+				PURL:      "pkg:golang/github.com/gin-gonic/gin",
+				Ranges: []domain.PackageRange{
+					{
+						Type: "ECOSYSTEM",
+						Events: []domain.PackageRangeEvent{
+							{Introduced: "0"},
+							{Fixed: "v1.10.0"},
+						},
+					},
+				},
+			},
+		},
+	}
+	got, ok := matchPackage(purl, vuln)
+	if !ok || !got.Matched {
+		t.Fatalf("Go match failed, ok=%v res=%+v", ok, got)
+	}
+}
+
+func TestMatchPackageMaven(t *testing.T) {
+	purl, _ := domain.ParsePURL("pkg:maven/org.apache.commons/commons-lang3@3.12.0")
+	vuln := domain.Vulnerability{
+		ID:     "GHSA-maven-1",
+		Source: "osv",
+		PackageApplicability: []domain.PackageApplicability{
+			{
+				Name:      "org.apache.commons:commons-lang3",
+				Ecosystem: "Maven",
+				PURL:      "pkg:maven/org.apache.commons/commons-lang3",
+				Ranges: []domain.PackageRange{
+					{
+						Type: "ECOSYSTEM",
+						Events: []domain.PackageRangeEvent{
+							{Introduced: "0"},
+							{Fixed: "3.13.0"},
+						},
+					},
+				},
+			},
+		},
+	}
+	got, ok := matchPackage(purl, vuln)
+	if !ok || !got.Matched {
+		t.Fatalf("Maven match failed, ok=%v res=%+v", ok, got)
+	}
+}
+
+func TestMatchPackageVersionsListExact(t *testing.T) {
+	purl, _ := domain.ParsePURL("pkg:pypi/django@4.2.0")
+	vuln := domain.Vulnerability{
+		ID:     "GHSA-exact",
+		Source: "osv",
+		PackageApplicability: []domain.PackageApplicability{
+			{
+				Name:      "django",
+				Ecosystem: "PyPI",
+				PURL:      "pkg:pypi/django",
+				Versions:  []string{"4.2.0", "4.2.1"},
+			},
+		},
+	}
+	got, ok := matchPackage(purl, vuln)
+	if !ok || !got.Matched {
+		t.Fatalf("exact version list match failed: ok=%v res=%+v", ok, got)
+	}
+	if got.Mode != "exact" {
+		t.Fatalf("Mode = %q, want exact", got.Mode)
 	}
 }

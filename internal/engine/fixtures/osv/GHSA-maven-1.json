@@ -1,0 +1,22 @@
+{
+  "id": "GHSA-maven-1",
+  "source": "osv",
+  "summary": "Synthetic Maven fixture for commons-lang3",
+  "aliases": [],
+  "package_applicability": [
+    {
+      "name": "org.apache.commons:commons-lang3",
+      "ecosystem": "Maven",
+      "purl": "pkg:maven/org.apache.commons/commons-lang3",
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {"introduced": "0"},
+            {"fixed": "3.13.0"}
+          ]
+        }
+      ]
+    }
+  ]
+}
