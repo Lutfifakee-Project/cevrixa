@@ -59,6 +59,8 @@ func runDetect(args []string) error {
 		return output.RenderJSON(os.Stdout, report)
 	case "jsonl":
 		return output.RenderJSONL(os.Stdout, report)
+	case "sarif":
+		return output.RenderSARIF(os.Stdout, report, Version)
 	default:
 		return fmt.Errorf("detect: unsupported --output %q", flags.Output)
 	}
@@ -145,9 +147,9 @@ func validateDetectFlags(f detectFlags) error {
 		return errors.New("detect: --version requires --product")
 	}
 	switch f.Output {
-	case "", "human", "json", "jsonl":
+	case "", "human", "json", "jsonl", "sarif":
 	default:
-		return fmt.Errorf("detect: unsupported --output %q (supported: human, json, jsonl)", f.Output)
+		return fmt.Errorf("detect: unsupported --output %q (supported: human, json, jsonl, sarif)", f.Output)
 	}
 	return nil
 }
@@ -163,12 +165,12 @@ Flags:
   --cpe <cpe>          CPE 2.3 identifier
   --purl <purl>        Package URL (e.g. pkg:pypi/django@4.2.0)
   --with-kev           Enrich findings with CISA KEV data
-  --output <fmt>       Output format: human (default), json, or jsonl
+  --output <fmt>       Output format: human (default), json, jsonl, or sarif
   -h, --help           Show this help
 
 Examples:
   cevrixa detect --product "Apache HTTP Server" --version "2.4.49"
   cevrixa detect --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
   cevrixa detect --purl "pkg:pypi/django@4.2.0"
-  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --output jsonl`)
+  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --output sarif`)
 }

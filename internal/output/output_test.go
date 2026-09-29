@@ -225,3 +225,103 @@ func TestRenderJSONLEmpty(t *testing.T) {
 		t.Fatalf("expected empty output, got: %q", buf.String())
 	}
 }
+func TestRenderSARIFValid(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderSARIF(&buf, sampleReport(), "test-version"); err != nil {
+		t.Fatalf("RenderSARIF: %v", err)
+	}
+
+	var parsed struct {
+		Schema  string `json:"$schema"`
+		Version string `json:"version"`
+		Runs    []struct {
+			Tool struct {
+				Driver struct {
+					Name    string `json:"name"`
+					Version string `json:"version"`
+				} `json:"driver"`
+			} `json:"tool"`
+			Results []struct {
+				RuleID  string `json:"ruleId"`
+				Level   string `json:"level"`
+				Message struct {
+					Text string `json:"text"`
+				} `json:"message"`
+			} `json:"results"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid SARIF JSON: %v\n%s", err, buf.String())
+	}
+	if parsed.Version != "2.1.0" {
+		t.Fatalf("version = %q, want 2.1.0", parsed.Version)
+	}
+	if parsed.Schema == "" {
+		t.Fatal("$schema missing")
+	}
+	if len(parsed.Runs) != 1 {
+		t.Fatalf("expected 1 run, got %d", len(parsed.Runs))
+	}
+	if parsed.Runs[0].Tool.Driver.Name != "Cevrixa" {
+		t.Fatalf("driver name = %q", parsed.Runs[0].Tool.Driver.Name)
+	}
+	if parsed.Runs[0].Tool.Driver.Version != "test-version" {
+		t.Fatalf("driver version = %q", parsed.Runs[0].Tool.Driver.Version)
+	}
+	if len(parsed.Runs[0].Results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(parsed.Runs[0].Results))
+	}
+	if parsed.Runs[0].Results[0].RuleID != "CVE-2021-41773" {
+		t.Fatalf("ruleId = %q", parsed.Runs[0].Results[0].RuleID)
+	}
+	if parsed.Runs[0].Results[0].Level != "warning" {
+		t.Fatalf("level = %q, want warning", parsed.Runs[0].Results[0].Level)
+	}
+}
+
+func TestRenderSARIFKEVEscalatesLevel(t *testing.T) {
+	report := sampleReport()
+	report.Findings[0].KnownExploited = &domain.KEVInfo{
+		CVEID:     "CVE-2021-41773",
+		DateAdded: "2021-11-03",
+	}
+
+	var buf bytes.Buffer
+	if err := RenderSARIF(&buf, report, "test"); err != nil {
+		t.Fatalf("RenderSARIF: %v", err)
+	}
+
+	var parsed struct {
+		Runs []struct {
+			Results []struct {
+				Level string `json:"level"`
+			} `json:"results"`
+		} `json:"runs"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if parsed.Runs[0].Results[0].Level != "error" {
+		t.Fatalf("KEV finding should escalate to error, got %q", parsed.Runs[0].Results[0].Level)
+	}
+}
+
+func TestRenderSARIFEmptyReport(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderSARIF(&buf, domain.Report{}, "test"); err != nil {
+		t.Fatalf("RenderSARIF: %v", err)
+	}
+	var parsed struct {
+		Version string `json:"version"`
+		Runs    []any  `json:"runs"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if parsed.Version != "2.1.0" {
+		t.Fatalf("version = %q", parsed.Version)
+	}
+	if len(parsed.Runs) != 1 {
+		t.Fatalf("expected 1 run even if empty, got %d", len(parsed.Runs))
+	}
+}
