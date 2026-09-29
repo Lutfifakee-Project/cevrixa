@@ -21,6 +21,8 @@ type detectFlags struct {
 	WithKEV bool
 	FailOn  string
 	DB      string
+	Verbose bool
+	Quiet   bool
 }
 
 func runDetect(args []string) error {
@@ -64,7 +66,10 @@ func runDetect(args []string) error {
 	var renderErr error
 	switch flags.Output {
 	case "", "human":
-		renderErr = output.RenderHuman(os.Stdout, report)
+		renderErr = output.RenderHumanWithOptions(os.Stdout, report, output.RenderOptions{
+			Verbose: flags.Verbose,
+			Quiet:   flags.Quiet,
+		})
 	case "json":
 		renderErr = output.RenderJSON(os.Stdout, report)
 	case "jsonl":
@@ -100,6 +105,14 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 		}
 		if arg == "--with-kev" {
 			f.WithKEV = true
+			continue
+		}
+		if arg == "--verbose" {
+			f.Verbose = true
+			continue
+		}
+		if arg == "--quiet" {
+			f.Quiet = true
 			continue
 		}
 
@@ -190,14 +203,15 @@ Flags:
   --cpe <cpe>          CPE 2.3 identifier
   --purl <purl>        Package URL (e.g. pkg:pypi/django@4.2.0)
   --with-kev           Enrich findings with CISA KEV data
-  --db <path>          Read KEV from SQLite database (default: embedded)
+  --db <path>          Read from SQLite database (KEV + CVE)
   --fail-on <level>    Exit non-zero if any finding matches: any, affected, kev
+  --verbose            Show full reasoning steps
+  --quiet              Print only CVE-ID + status per finding
   --output <fmt>       Output format: human (default), json, jsonl, or sarif
   -h, --help           Show this help
 
 Examples:
   cevrixa detect --product "Apache HTTP Server" --version "2.4.49"
-  cevrixa detect --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
   cevrixa detect --purl "pkg:pypi/django@4.2.0"
-  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --with-kev --db ~/.cevrixa/cevrixa.db`)
+  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --verbose`)
 }

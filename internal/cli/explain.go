@@ -20,6 +20,8 @@ type explainFlags struct {
 	PURL    string
 	Output  string
 	DB      string
+	Verbose bool
+	Quiet   bool
 }
 
 func runExplain(args []string) error {
@@ -31,7 +33,6 @@ func runExplain(args []string) error {
 		return err
 	}
 
-	// Resolve target.
 	target := domain.Target{
 		Product: flags.Product,
 		Version: flags.Version,
@@ -46,7 +47,6 @@ func runExplain(args []string) error {
 	}
 	target.ResolvedCPE = res.CPE
 
-	// Load options (KEV not needed here; DB for store).
 	opts := engine.Options{}
 	if s, err := openStoreIfDB(flags.DB); err != nil {
 		return fmt.Errorf("explain: %w", err)
@@ -55,13 +55,11 @@ func runExplain(args []string) error {
 		opts.Store = s
 	}
 
-	// Look up the vulnerability.
 	vuln, err := engine.FindByID(flags.VulnID, opts)
 	if err != nil {
 		return fmt.Errorf("explain: %w", err)
 	}
 
-	// Build the explain report.
 	report := output.ExplainReport{
 		Vulnerability: vuln,
 		Target:        target,
@@ -83,7 +81,10 @@ func runExplain(args []string) error {
 
 	switch flags.Output {
 	case "", "human":
-		return output.RenderExplainHuman(os.Stdout, report)
+		return output.RenderExplainHumanWithOptions(os.Stdout, report, output.RenderOptions{
+			Verbose: flags.Verbose,
+			Quiet:   flags.Quiet,
+		})
 	case "json":
 		return output.RenderExplainJSON(os.Stdout, report)
 	default:
@@ -101,8 +102,15 @@ func parseExplainArgs(args []string) (explainFlags, error) {
 			printExplainUsage()
 			return explainFlags{}, errHelpRequested
 		}
+		if arg == "--verbose" {
+			f.Verbose = true
+			continue
+		}
+		if arg == "--quiet" {
+			f.Quiet = true
+			continue
+		}
 
-		// First positional arg is the vulnerability ID.
 		if len(arg) > 0 && arg[0] != '-' {
 			if f.VulnID == "" {
 				f.VulnID = arg
@@ -182,11 +190,13 @@ Flags:
   --cpe <cpe>          CPE 2.3 identifier
   --purl <purl>        Package URL
   --db <path>          Read from SQLite database (default: embedded)
+  --verbose            Show full reasoning steps
+  --quiet              Print only ID + decision
   --output <fmt>       Output format: human (default) or json
   -h, --help           Show this help
 
 Examples:
   cevrixa explain CVE-2021-41773 --product "Apache HTTP Server" --version "2.4.49"
   cevrixa explain CVE-2021-41773 --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
-  cevrixa explain CVE-2021-41773 --product "Apache HTTP Server" --version "2.4.49" --output json`)
+  cevrixa explain CVE-2021-41773 --product "Apache HTTP Server" --version "2.4.49" --quiet`)
 }

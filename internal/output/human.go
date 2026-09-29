@@ -8,17 +8,26 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 )
 
+type RenderOptions struct {
+	Verbose bool
+	Quiet   bool
+}
+
 func RenderHuman(w io.Writer, r domain.Report) error {
+	return RenderHumanWithOptions(w, r, RenderOptions{})
+}
+
+func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) error {
+	if opts.Quiet {
+		return renderHumanQuiet(w, r)
+	}
+
 	if _, err := fmt.Fprintln(w, "Cevrixa"); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintln(w); err != nil {
-		return err
-	}
+	fmt.Fprintln(w)
 
-	if _, err := fmt.Fprintln(w, "Target"); err != nil {
-		return err
-	}
+	fmt.Fprintln(w, "Target")
 	if r.Target.Product != "" {
 		fmt.Fprintf(w, "  Product : %s\n", r.Target.Product)
 	}
@@ -27,6 +36,9 @@ func RenderHuman(w io.Writer, r domain.Report) error {
 	}
 	if r.Target.CPE != "" {
 		fmt.Fprintf(w, "  CPE     : %s\n", r.Target.CPE)
+	}
+	if r.Target.PURL != "" {
+		fmt.Fprintf(w, "  PURL    : %s\n", r.Target.PURL)
 	}
 	if r.Target.ResolvedCPE != "" && r.Target.ResolvedCPE != r.Target.CPE {
 		fmt.Fprintf(w, "  Resolved: %s\n", r.Target.ResolvedCPE)
@@ -56,8 +68,23 @@ func RenderHuman(w io.Writer, r domain.Report) error {
 			}
 			fmt.Fprintln(w, line)
 		}
+		if opts.Verbose && len(f.Why.Steps) > 0 {
+			fmt.Fprintln(w, "  Steps:")
+			for _, s := range f.Why.Steps {
+				fmt.Fprintf(w, "    - %s\n", s)
+			}
+		}
 		fmt.Fprintf(w, "  Evidence   : %d\n", len(f.Evidence))
 	}
 
+	return nil
+}
+
+func renderHumanQuiet(w io.Writer, r domain.Report) error {
+	for _, f := range r.Findings {
+		if _, err := fmt.Fprintf(w, "%s %s\n", f.VulnerabilityID, strings.ToUpper(string(f.Status))); err != nil {
+			return err
+		}
+	}
 	return nil
 }

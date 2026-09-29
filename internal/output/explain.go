@@ -9,7 +9,6 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/matcher"
 )
 
-// ExplainReport bundles everything the explain formatter needs.
 type ExplainReport struct {
 	Vulnerability domain.Vulnerability
 	Target        domain.Target
@@ -21,14 +20,23 @@ type ExplainReport struct {
 }
 
 func RenderExplainHuman(w io.Writer, r ExplainReport) error {
-	if _, err := fmt.Fprintln(w, r.Vulnerability.ID); err != nil {
+	return RenderExplainHumanWithOptions(w, r, RenderOptions{})
+}
+
+func RenderExplainHumanWithOptions(w io.Writer, r ExplainReport, opts RenderOptions) error {
+	if opts.Quiet {
+		decision := "NOT_AFFECTED"
+		if r.Applicable {
+			decision = "AFFECTED"
+		}
+		_, err := fmt.Fprintf(w, "%s %s\n", r.Vulnerability.ID, decision)
 		return err
 	}
+
+	fmt.Fprintln(w, r.Vulnerability.ID)
 	fmt.Fprintln(w)
 
-	if _, err := fmt.Fprintln(w, "Decision"); err != nil {
-		return err
-	}
+	fmt.Fprintln(w, "Decision")
 	decision := "NOT AFFECTED"
 	if r.Applicable {
 		decision = "AFFECTED"
@@ -36,9 +44,7 @@ func RenderExplainHuman(w io.Writer, r ExplainReport) error {
 	fmt.Fprintf(w, "  %s\n", decision)
 	fmt.Fprintln(w)
 
-	if _, err := fmt.Fprintln(w, "Identity"); err != nil {
-		return err
-	}
+	fmt.Fprintln(w, "Identity")
 	if r.Target.Product != "" {
 		fmt.Fprintf(w, "  Product  : %s\n", r.Target.Product)
 	}
@@ -54,16 +60,12 @@ func RenderExplainHuman(w io.Writer, r ExplainReport) error {
 	fmt.Fprintln(w)
 
 	if r.Match.Criteria != "" {
-		if _, err := fmt.Fprintln(w, "Applicability"); err != nil {
-			return err
-		}
+		fmt.Fprintln(w, "Applicability")
 		fmt.Fprintf(w, "  Source   : %s\n", r.Vulnerability.Source)
 		if r.Match.Range != "" {
 			fmt.Fprintf(w, "  Range    : %s\n", r.Match.Range)
 		}
-		if r.Match.Criteria != "" {
-			fmt.Fprintf(w, "  Criteria : %s\n", r.Match.Criteria)
-		}
+		fmt.Fprintf(w, "  Criteria : %s\n", r.Match.Criteria)
 		result := "NO MATCH"
 		if r.Applicable {
 			result = "MATCH"
@@ -73,18 +75,14 @@ func RenderExplainHuman(w io.Writer, r ExplainReport) error {
 	}
 
 	if r.Fixed != "" {
-		if _, err := fmt.Fprintln(w, "Fixed"); err != nil {
-			return err
-		}
+		fmt.Fprintln(w, "Fixed")
 		fmt.Fprintf(w, "  %s\n", r.Fixed)
 		fmt.Fprintln(w)
 	}
 
 	why := matcher.BuildWhy(r.TargetCPE, r.Match)
 	if len(why.Steps) > 0 {
-		if _, err := fmt.Fprintln(w, "Why"); err != nil {
-			return err
-		}
+		fmt.Fprintln(w, "Why")
 		for _, step := range why.Steps {
 			fmt.Fprintf(w, "  - %s\n", step)
 		}
@@ -92,9 +90,7 @@ func RenderExplainHuman(w io.Writer, r ExplainReport) error {
 	}
 
 	if len(r.Vulnerability.References) > 0 {
-		if _, err := fmt.Fprintln(w, "Evidence"); err != nil {
-			return err
-		}
+		fmt.Fprintln(w, "Evidence")
 		for _, ref := range r.Vulnerability.References {
 			fmt.Fprintf(w, "  [%s] reference: %s\n", ref.Source, ref.URL)
 		}
@@ -102,9 +98,7 @@ func RenderExplainHuman(w io.Writer, r ExplainReport) error {
 	}
 
 	if r.Confidence != "" {
-		if _, err := fmt.Fprintln(w, "Confidence"); err != nil {
-			return err
-		}
+		fmt.Fprintln(w, "Confidence")
 		fmt.Fprintf(w, "  %s\n", strings.ToUpper(r.Confidence))
 	}
 
