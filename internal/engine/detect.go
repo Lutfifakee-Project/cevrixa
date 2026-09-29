@@ -8,7 +8,9 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/resolver"
 )
 
-type Options struct{}
+type Options struct {
+	KEV map[string]domain.KEVInfo
+}
 
 func Detect(target domain.Target, opts Options) (domain.Report, error) {
 	r := resolver.New()
@@ -41,7 +43,14 @@ func Detect(target domain.Target, opts Options) (domain.Report, error) {
 		if !mr.Matched {
 			continue
 		}
-		findings = append(findings, buildFinding(targetCPE, v, mr))
+		f := buildFinding(targetCPE, v, mr)
+		if opts.KEV != nil {
+			if info, ok := opts.KEV[v.ID]; ok {
+				infoCopy := info
+				f.KnownExploited = &infoCopy
+			}
+		}
+		findings = append(findings, f)
 	}
 
 	return domain.Report{Target: target, Findings: findings}, nil

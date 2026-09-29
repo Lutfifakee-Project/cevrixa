@@ -105,3 +105,50 @@ func TestDetectConfidenceIsStrongForRangeMatch(t *testing.T) {
 		}
 	}
 }
+func TestDetectWithoutKEV(t *testing.T) {
+	target := domain.Target{Product: "Apache HTTP Server", Version: "2.4.49"}
+	report, err := Detect(target, Options{})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	for _, f := range report.Findings {
+		if f.KnownExploited != nil {
+			t.Fatalf("KnownExploited should be nil without KEV, got %+v", f.KnownExploited)
+		}
+	}
+}
+
+func TestDetectWithKEV(t *testing.T) {
+	target := domain.Target{Product: "Apache HTTP Server", Version: "2.4.49"}
+	kevData := map[string]domain.KEVInfo{
+		"CVE-2021-41773": {
+			CVEID:         "CVE-2021-41773",
+			VendorProject: "Apache",
+			Product:       "HTTP Server",
+			DateAdded:     "2021-11-03",
+		},
+	}
+	report, err := Detect(target, Options{KEV: kevData})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+
+	var found bool
+	for _, f := range report.Findings {
+		if f.VulnerabilityID == "CVE-2021-41773" {
+			if f.KnownExploited == nil {
+				t.Fatal("KnownExploited should be set")
+			}
+			if f.KnownExploited.VendorProject != "Apache" {
+				t.Fatalf("VendorProject = %q", f.KnownExploited.VendorProject)
+			}
+			found = true
+		}
+		if f.VulnerabilityID == "CVE-2021-42013" && f.KnownExploited != nil {
+			t.Fatalf("CVE-2021-42013 should not be in KEV, got %+v", f.KnownExploited)
+		}
+	}
+	if !found {
+		t.Fatal("CVE-2021-41773 not found")
+	}
+}

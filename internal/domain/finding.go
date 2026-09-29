@@ -42,6 +42,7 @@ type Finding struct {
 	FixedVersions   []string          `json:"fixed_versions,omitempty"`
 	Evidence        []Evidence        `json:"evidence,omitempty"`
 	Conflicts       []Conflict        `json:"conflicts,omitempty"`
+	KnownExploited  *KEVInfo          `json:"known_exploited,omitempty"`
 }
 
 type Report struct {

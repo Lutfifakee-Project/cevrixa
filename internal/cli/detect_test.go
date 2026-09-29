@@ -74,3 +74,17 @@ func TestDetectPURLNotImplemented(t *testing.T) {
 		t.Fatalf("detect --purl should return errNotImplemented, got: %v", err)
 	}
 }
+func TestParseDetectArgsWithKEV(t *testing.T) {
+	got, err := parseDetectArgs([]string{
+		"--product", "Apache", "--version", "2.4.49", "--with-kev",
+	})
+	if err != nil {
+		t.Fatalf("parseDetectArgs: %v", err)
+	}
+	if !got.WithKEV {
+		t.Fatal("WithKEV should be true")
+	}
+	if got.Product != "Apache" || got.Version != "2.4.49" {
+		t.Fatalf("got %+v", got)
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/engine"
 	"github.com/Lutfifakee-Project/cevrixa/internal/output"
+	"github.com/Lutfifakee-Project/cevrixa/internal/source/kev"
 )
 
 var errHelpRequested = errors.New("help requested")
@@ -18,6 +19,7 @@ type detectFlags struct {
 	CPE     string
 	PURL    string
 	Output  string
+	WithKEV bool
 }
 
 func runDetect(args []string) error {
@@ -39,7 +41,16 @@ func runDetect(args []string) error {
 		CPE:     flags.CPE,
 	}
 
-	report, err := engine.Detect(target, engine.Options{})
+	opts := engine.Options{}
+	if flags.WithKEV {
+		cat, err := kev.LoadEmbedded()
+		if err != nil {
+			return fmt.Errorf("detect: load KEV catalog: %w", err)
+		}
+		opts.KEV = cat.Entries
+	}
+
+	report, err := engine.Detect(target, opts)
 	if err != nil {
 		return fmt.Errorf("detect: %w", err)
 	}
@@ -63,6 +74,11 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 		if arg == "-h" || arg == "--help" {
 			printDetectUsage()
 			return detectFlags{}, errHelpRequested
+		}
+
+		if arg == "--with-kev" {
+			f.WithKEV = true
+			continue
 		}
 
 		key, value, hasInlineValue := splitFlag(arg)
@@ -147,14 +163,13 @@ Flags:
   --version <ver>      Product version
   --cpe <cpe>          CPE 2.3 identifier
   --purl <purl>        Package URL (not yet implemented)
+  --with-kev           Enrich findings with CISA KEV data
   --output <fmt>       Output format: human (default) or json
   -h, --help           Show this help
 
 Examples:
   cevrixa detect --product "Apache HTTP Server" --version "2.4.49"
   cevrixa detect --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
-  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --output json
-
-Note: detection currently uses embedded sample fixtures, not live upstream
-sources. Live NVD/OSV integration is planned for a later milestone.`)
+  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --with-kev
+  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --output json`)
 }

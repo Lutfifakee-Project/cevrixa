@@ -49,6 +49,13 @@ func RenderHuman(w io.Writer, r domain.Report) error {
 		if f.Why.VersionMatch != "" {
 			fmt.Fprintf(w, "  Why        : %s\n", f.Why.VersionMatch)
 		}
+		if f.KnownExploited != nil {
+			line := "  KEV        : YES"
+			if f.KnownExploited.DateAdded != "" {
+				line += " (added " + f.KnownExploited.DateAdded + ")"
+			}
+			fmt.Fprintln(w, line)
+		}
 		fmt.Fprintf(w, "  Evidence   : %d\n", len(f.Evidence))
 	}
 

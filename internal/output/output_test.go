@@ -137,3 +137,33 @@ func TestRenderJSONNoHTMLEscape(t *testing.T) {
 		t.Fatalf("expected literal >= in JSON output\n%s", out)
 	}
 }
+func TestRenderHumanWithKEV(t *testing.T) {
+	report := sampleReport()
+	report.Findings[0].KnownExploited = &domain.KEVInfo{
+		CVEID:     "CVE-2021-41773",
+		DateAdded: "2021-11-03",
+	}
+
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, report); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "KEV") {
+		t.Fatalf("expected KEV line in output:\n%s", out)
+	}
+	if !strings.Contains(out, "2021-11-03") {
+		t.Fatalf("expected date in output:\n%s", out)
+	}
+}
+
+func TestRenderHumanWithoutKEV(t *testing.T) {
+	report := sampleReport()
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, report); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	if strings.Contains(buf.String(), "KEV") {
+		t.Fatalf("KEV line should not appear without KnownExploited:\n%s", buf.String())
+	}
+}
