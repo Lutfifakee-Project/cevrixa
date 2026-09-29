@@ -1,5 +1,5 @@
 # Cevrixa
-
+Know WHY a vulnerability applies.
 **Evidence-first vulnerability applicability engine.**
 
 Cevrixa is an open-source security CLI focused on determining whether a specific software or package version is affected by known vulnerabilities, with an emphasis on explainable applicability and evidence.
