@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/engine"
@@ -40,12 +39,7 @@ func runDetect(args []string) error {
 		CPE:     flags.CPE,
 	}
 
-	fixturesDir, err := defaultFixturesDir()
-	if err != nil {
-		return fmt.Errorf("detect: locate fixtures: %w", err)
-	}
-
-	report, err := engine.Detect(target, engine.Options{FixturesDir: fixturesDir})
+	report, err := engine.Detect(target, engine.Options{})
 	if err != nil {
 		return fmt.Errorf("detect: %w", err)
 	}
@@ -58,23 +52,6 @@ func runDetect(args []string) error {
 	default:
 		return fmt.Errorf("detect: unsupported --output %q", flags.Output)
 	}
-}
-
-func defaultFixturesDir() (string, error) {
-	// Look for testdata/cve relative to the current working directory first,
-	// then relative to the executable's directory.
-	candidates := []string{
-		filepath.Join("testdata", "cve"),
-	}
-	if exe, err := os.Executable(); err == nil {
-		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "..", "..", "testdata", "cve"))
-	}
-	for _, c := range candidates {
-		if info, err := os.Stat(c); err == nil && info.IsDir() {
-			return c, nil
-		}
-	}
-	return "", fmt.Errorf("testdata/cve not found; run from repository root")
 }
 
 func parseDetectArgs(args []string) (detectFlags, error) {
@@ -178,6 +155,6 @@ Examples:
   cevrixa detect --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
   cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --output json
 
-Note: detection currently uses bundled sample fixtures, not live upstream
+Note: detection currently uses embedded sample fixtures, not live upstream
 sources. Live NVD/OSV integration is planned for a later milestone.`)
 }
