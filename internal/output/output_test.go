@@ -325,3 +325,23 @@ func TestRenderSARIFEmptyReport(t *testing.T) {
 		t.Fatalf("expected 1 run even if empty, got %d", len(parsed.Runs))
 	}
 }
+func TestRenderHumanWithEnrichment(t *testing.T) {
+	report := sampleReport()
+	report.Findings[0].Enrichment = &domain.Enrichment{
+		Source:         "dbcve",
+		Mitigation:     "Upgrade to 2.4.51",
+		PoCURL:         "https://example.test/poc",
+		PatchCommitURL: "https://example.test/commit",
+	}
+
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, report); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Mitigation", "Upgrade to 2.4.51", "PoC", "Patch"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("output missing %q\n%s", want, out)
+		}
+	}
+}

@@ -8,7 +8,15 @@ import (
 	"time"
 )
 
-// rateLimiter enforces a minimum interval between successive requests.
+// disableRateLimit is set by tests to skip rate limiter waits.
+var disableRateLimit bool
+
+// DisableRateLimit disables the NVD rate limiter globally. Intended for
+// tests only.
+func DisableRateLimit() {
+	disableRateLimit = true
+}
+
 type rateLimiter struct {
 	mu       sync.Mutex
 	interval time.Duration
@@ -47,6 +55,9 @@ func (r *rateLimiter) wait(ctx context.Context) error {
 // NVD public limit: 5 requests per 30 seconds → 6s interval.
 // With API key: 50 requests per 30 seconds → 0.6s interval.
 func defaultInterval(hasAPIKey bool) time.Duration {
+	if disableRateLimit {
+		return 0
+	}
 	if hasAPIKey {
 		return 600 * time.Millisecond
 	}

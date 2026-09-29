@@ -13,6 +13,10 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/store"
 )
 
+func init() {
+	nvd.DisableRateLimit()
+}
+
 func openTestStore(t *testing.T) *store.Store {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.db")

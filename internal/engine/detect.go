@@ -55,6 +55,7 @@ func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 		}
 		f := buildFinding(targetCPE, v, mr)
 		attachKEV(&f, v.ID, opts)
+		attachEnrichment(&f, v.ID, opts)
 		findings = append(findings, f)
 	}
 
@@ -89,6 +90,7 @@ func detectByPURL(target domain.Target, opts Options) (domain.Report, error) {
 		}
 		f := buildPackageFinding(purl, v, pr)
 		attachKEV(&f, v.ID, opts)
+		attachEnrichment(&f, v.ID, opts)
 		findings = append(findings, f)
 	}
 
@@ -103,4 +105,15 @@ func attachKEV(f *domain.Finding, cveID string, opts Options) {
 		infoCopy := info
 		f.KnownExploited = &infoCopy
 	}
+}
+
+func attachEnrichment(f *domain.Finding, cveID string, opts Options) {
+	if opts.Store == nil {
+		return
+	}
+	e, err := opts.Store.GetEnrichmentAny(cveID, "")
+	if err != nil {
+		return
+	}
+	f.Enrichment = &e
 }

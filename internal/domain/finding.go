@@ -43,6 +43,7 @@ type Finding struct {
 	Evidence        []Evidence        `json:"evidence,omitempty"`
 	Conflicts       []Conflict        `json:"conflicts,omitempty"`
 	KnownExploited  *KEVInfo          `json:"known_exploited,omitempty"`
+	Enrichment      *Enrichment       `json:"enrichment,omitempty"`
 }
 
 type Report struct {
@@ -50,6 +51,14 @@ type Report struct {
 	Findings []Finding `json:"findings"`
 }
 
+// IsSeverityAtLeast reports whether the finding matches or exceeds the
+// given threshold. Recognized thresholds (case-sensitive):
+//
+//	any       — any finding
+//	affected  — only AFFECTED / CONFLICT
+//	kev       — only findings with KnownExploited set
+//
+// An empty or unrecognized threshold returns false.
 func (f Finding) IsSeverityAtLeast(threshold string) bool {
 	switch threshold {
 	case "", "none":

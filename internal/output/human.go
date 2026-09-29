@@ -22,9 +22,7 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 		return renderHumanQuiet(w, r)
 	}
 
-	if _, err := fmt.Fprintln(w, "Cevrixa"); err != nil {
-		return err
-	}
+	fmt.Fprintln(w, "Cevrixa")
 	fmt.Fprintln(w)
 
 	fmt.Fprintln(w, "Target")
@@ -67,6 +65,17 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 				line += " (added " + f.KnownExploited.DateAdded + ")"
 			}
 			fmt.Fprintln(w, line)
+		}
+		if f.Enrichment != nil {
+			if f.Enrichment.Mitigation != "" {
+				fmt.Fprintf(w, "  Mitigation : %s\n", f.Enrichment.Mitigation)
+			}
+			if f.Enrichment.PoCURL != "" {
+				fmt.Fprintf(w, "  PoC        : %s\n", f.Enrichment.PoCURL)
+			}
+			if f.Enrichment.PatchCommitURL != "" {
+				fmt.Fprintf(w, "  Patch      : %s\n", f.Enrichment.PatchCommitURL)
+			}
 		}
 		if opts.Verbose && len(f.Why.Steps) > 0 {
 			fmt.Fprintln(w, "  Steps:")

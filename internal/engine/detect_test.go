@@ -214,3 +214,56 @@ func TestDetectFallbackToEmbeddedWhenStoreEmpty(t *testing.T) {
 		t.Fatalf("expected embedded fallback findings, got %d", len(report.Findings))
 	}
 }
+func TestDetectAttachesEnrichment(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer s.Close()
+
+	if err := s.SaveVulnerability(domain.Vulnerability{
+		ID:     "CVE-ENRICH-001",
+		Source: "nvd",
+		Applicability: []domain.ApplicabilityNode{
+			{
+				Operator: "OR",
+				Matches: []domain.CPEMatch{
+					{
+						Vulnerable:       true,
+						Criteria:         "cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*",
+						VersionStart:     "2.4.0",
+						VersionStartMode: domain.BoundModeIncluding,
+						VersionEnd:       "2.4.51",
+						VersionEndMode:   domain.BoundModeExcluding,
+					},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveVulnerability: %v", err)
+	}
+
+	if err := s.SaveEnrichment(domain.Enrichment{
+		Source:          "dbcve",
+		VulnerabilityID: "CVE-ENRICH-001",
+		Mitigation:      "upgrade now",
+	}); err != nil {
+		t.Fatalf("SaveEnrichment: %v", err)
+	}
+
+	target := domain.Target{Product: "Apache HTTP Server", Version: "2.4.49"}
+	report, err := Detect(target, Options{Store: s})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	if len(report.Findings) != 1 {
+		t.Fatalf("expected 1 finding, got %d", len(report.Findings))
+	}
+	if report.Findings[0].Enrichment == nil {
+		t.Fatal("Enrichment should be attached")
+	}
+	if report.Findings[0].Enrichment.Mitigation != "upgrade now" {
+		t.Fatalf("Mitigation = %q", report.Findings[0].Enrichment.Mitigation)
+	}
+}
