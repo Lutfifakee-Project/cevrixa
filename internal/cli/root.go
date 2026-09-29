@@ -19,6 +19,8 @@ func Run(args []string) error {
 		return runDetect(args[1:])
 	case "scan":
 		return runScan(args[1:])
+	case "sync":
+		return runSync(args[1:])
 	case "sbom":
 		return runSBOM(args[1:])
 	case "help", "-h", "--help":
