@@ -20,6 +20,12 @@ func normalizeEcosystem(purlType string) string {
 		return "Packagist"
 	case "nuget":
 		return "NuGet"
+	case "deb", "debian":
+		return "Debian"
+	case "apk", "alpine":
+		return "Alpine"
+	case "rpm", "redhat", "fedora":
+		return "Red Hat"
 	default:
 		return ""
 	}

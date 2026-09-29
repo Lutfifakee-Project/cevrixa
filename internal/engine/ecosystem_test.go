@@ -62,3 +62,23 @@ func TestMatchNameMaven(t *testing.T) {
 		t.Fatal("Maven should require group:artifact")
 	}
 }
+
+func TestNormalizeEcosystemDebianFamily(t *testing.T) {
+	cases := map[string]string{
+		"deb":    "Debian",
+		"debian": "Debian",
+		"apk":    "Alpine",
+		"alpine": "Alpine",
+		"rpm":    "Red Hat",
+		"redhat": "Red Hat",
+		"fedora": "Red Hat",
+	}
+	for in, want := range cases {
+		t.Run(in, func(t *testing.T) {
+			got := normalizeEcosystem(in)
+			if got != want {
+				t.Fatalf("normalizeEcosystem(%q) = %q, want %q", in, got, want)
+			}
+		})
+	}
+}

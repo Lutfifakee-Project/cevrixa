@@ -1,0 +1,22 @@
+{
+  "id": "GHSA-deb-1",
+  "source": "osv",
+  "summary": "Synthetic Debian fixture for openssl",
+  "aliases": [],
+  "package_applicability": [
+    {
+      "name": "openssl",
+      "ecosystem": "Debian",
+      "purl": "pkg:deb/debian/openssl",
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {"introduced": "0"},
+            {"fixed": "1.1.2"}
+          ]
+        }
+      ]
+    }
+  ]
+}

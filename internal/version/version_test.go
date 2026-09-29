@@ -205,3 +205,70 @@ func TestParseLenientRejectsGarbage(t *testing.T) {
 		}
 	}
 }
+
+func TestParseDebianBasic(t *testing.T) {
+	v, err := ParseDebian("2.4.7-1")
+	if err != nil {
+		t.Fatalf("ParseDebian: %v", err)
+	}
+	if v.Raw() != "2.4.7-1" {
+		t.Fatalf("Raw = %q", v.Raw())
+	}
+	// Upstream should match strict parse of just "2.4.7".
+	upstream, _ := Parse("2.4.7")
+	if v.components[0] != upstream.components[0] {
+		t.Fatalf("upstream mismatch")
+	}
+}
+
+func TestParseDebianEpoch(t *testing.T) {
+	v, err := ParseDebian("1:2.4.7-1ubuntu4.20")
+	if err != nil {
+		t.Fatalf("ParseDebian: %v", err)
+	}
+	if v.Raw() != "1:2.4.7-1ubuntu4.20" {
+		t.Fatalf("Raw = %q", v.Raw())
+	}
+}
+
+func TestParseDebianRevisionOrdering(t *testing.T) {
+	v1, err := ParseDebian("2.4.7-1")
+	if err != nil {
+		t.Fatalf("ParseDebian v1: %v", err)
+	}
+	v2, err := ParseDebian("2.4.7-2")
+	if err != nil {
+		t.Fatalf("ParseDebian v2: %v", err)
+	}
+	if v1.Compare(v2) >= 0 {
+		t.Fatalf("2.4.7-1 should be < 2.4.7-2")
+	}
+}
+
+func TestParseRPMBasic(t *testing.T) {
+	v, err := ParseRPM("1.2.3-4.el8")
+	if err != nil {
+		t.Fatalf("ParseRPM: %v", err)
+	}
+	if v.Raw() != "1.2.3-4.el8" {
+		t.Fatalf("Raw = %q", v.Raw())
+	}
+	// The upstream "1.2.3" should compare equal ignoring the release.
+	upstream, err := Parse("1.2.3")
+	if err != nil {
+		t.Fatalf("Parse upstream: %v", err)
+	}
+	if v.components[0] != upstream.components[0] ||
+		v.components[1] != upstream.components[1] ||
+		v.components[2] != upstream.components[2] {
+		t.Fatalf("upstream numeric components mismatch")
+	}
+}
+
+func TestParseDebianRejectsGarbage(t *testing.T) {
+	for _, s := range []string{"", "v", "...", ":"} {
+		if _, err := ParseDebian(s); err == nil {
+			t.Fatalf("ParseDebian(%q) unexpectedly succeeded", s)
+		}
+	}
+}

@@ -234,3 +234,36 @@ func TestMatchPackageVersionsListExact(t *testing.T) {
 		t.Fatalf("Mode = %q, want exact", got.Mode)
 	}
 }
+func TestMatchPackageDebianEpoch(t *testing.T) {
+	purl, err := domain.ParsePURL("pkg:deb/debian/openssl@1.1.1")
+	if err != nil {
+		t.Fatalf("ParsePURL: %v", err)
+	}
+	vuln := domain.Vulnerability{
+		ID:     "GHSA-deb-1",
+		Source: "osv",
+		PackageApplicability: []domain.PackageApplicability{
+			{
+				Name:      "openssl",
+				Ecosystem: "Debian",
+				PURL:      "pkg:deb/debian/openssl",
+				Ranges: []domain.PackageRange{
+					{
+						Type: "ECOSYSTEM",
+						Events: []domain.PackageRangeEvent{
+							{Introduced: "0"},
+							{Fixed: "1.1.2"},
+						},
+					},
+				},
+			},
+		},
+	}
+	got, ok := matchPackage(purl, vuln)
+	if !ok || !got.Matched {
+		t.Fatalf("Debian match failed: ok=%v res=%+v", ok, got)
+	}
+	if got.Fixed != "1.1.2" {
+		t.Fatalf("Fixed = %q", got.Fixed)
+	}
+}

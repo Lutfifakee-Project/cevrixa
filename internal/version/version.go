@@ -370,3 +370,80 @@ func allDigits(s string) bool {
 func isAllowedPrereleaseChar(r rune) bool {
 	return r == '-' || r == '.' || unicode.IsLetter(r) || unicode.IsDigit(r)
 }
+
+// ParseDebian parses a Debian package version such as:
+//
+//	1:2.4.7-1ubuntu4.20
+//	2.4.7-1
+//	1:1.2.3-4
+//
+// Epoch (before ':') is stripped. The upstream version is compared using
+// the generic semantics; the Debian revision (after the last '-') is
+// captured and appended as a pre-release-like identifier so that
+// "2.4.7-1" < "2.4.7-2" and "2.4.7" < "2.4.7-1".
+//
+// This is a pragmatic approximation, not a full Debian policy implementation.
+func ParseDebian(s string) (Version, error) {
+	raw := strings.TrimSpace(s)
+	if raw == "" {
+		return Version{}, fmt.Errorf("version: empty input")
+	}
+
+	body := raw
+	if idx := strings.IndexByte(body, ':'); idx > 0 && allDigits(body[:idx]) {
+		body = body[idx+1:]
+	}
+
+	var upstream, revision string
+	if idx := strings.LastIndexByte(body, '-'); idx > 0 {
+		upstream = body[:idx]
+		revision = body[idx+1:]
+	} else {
+		upstream = body
+	}
+
+	v, err := Parse(upstream)
+	if err != nil {
+		return Version{}, fmt.Errorf("version: parse debian upstream %q: %w", upstream, err)
+	}
+
+	if revision != "" {
+		rev := Identifier{text: "~rev~" + revision}
+		v.prerelease = append(v.prerelease, rev)
+	}
+	v.raw = raw
+	return v, nil
+}
+
+// ParseRPM parses an RPM package version such as:
+//
+//	1.2.3-4.el8
+//	2.4.49-1
+//
+// Structure is VERSION-RELEASE. The release is captured as a
+// pre-release-like identifier so that "1.2.3-4.el8" > "1.2.3" (version alone).
+func ParseRPM(s string) (Version, error) {
+	raw := strings.TrimSpace(s)
+	if raw == "" {
+		return Version{}, fmt.Errorf("version: empty input")
+	}
+
+	var upstream, release string
+	if idx := strings.LastIndexByte(raw, '-'); idx > 0 {
+		upstream = raw[:idx]
+		release = raw[idx+1:]
+	} else {
+		upstream = raw
+	}
+
+	v, err := Parse(upstream)
+	if err != nil {
+		return Version{}, fmt.Errorf("version: parse rpm upstream %q: %w", upstream, err)
+	}
+
+	if release != "" {
+		v.prerelease = append(v.prerelease, Identifier{text: "~rel~" + release})
+	}
+	v.raw = raw
+	return v, nil
+}
