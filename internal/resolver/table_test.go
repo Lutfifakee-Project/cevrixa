@@ -43,3 +43,9 @@ func TestDefaultCatalogNoDuplicateAliases(t *testing.T) {
 		}
 	}
 }
+func TestDefaultCatalogHasMinimumProducts(t *testing.T) {
+	const min = 30
+	if len(defaultCatalog) < min {
+		t.Fatalf("catalog has %d products, expected at least %d", len(defaultCatalog), min)
+	}
+}
