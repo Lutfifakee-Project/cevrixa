@@ -15,6 +15,12 @@ type VulnerabilitySource interface {
 // Query describes a provider-neutral vulnerability lookup.
 type Query struct {
 	ID           string
+	PackageName  string
+	Ecosystem    string
+	PURL         string
+	Version      string
+	Commit       string
+	PageToken    string
 	StartIndex   int
 	ResultsLimit int
 }
@@ -25,4 +31,5 @@ type Result struct {
 	TotalResults    int
 	StartIndex      int
 	ResultsPerPage  int
+	NextPageToken   string
 }
