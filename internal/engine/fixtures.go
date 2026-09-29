@@ -69,3 +69,10 @@ func loadFixturesFS(fsys fs.FS, dir string) ([]domain.Vulnerability, error) {
 	}
 	return out, nil
 }
+func EmbeddedFixtureCount() int {
+	v, err := loadFixturesFromEmbed()
+	if err != nil {
+		return 0
+	}
+	return len(v)
+}

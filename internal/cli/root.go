@@ -27,6 +27,10 @@ func Run(args []string) error {
 		return runSync(args[1:])
 	case "explain":
 		return runExplain(args[1:])
+	case "info":
+		return runInfo(args[1:])
+	case "doctor":
+		return runDoctor(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -48,6 +52,8 @@ Commands:
   sbom       Read a CycloneDX SBOM and detect affected components
   sync       Download and persist vulnerability data to local store
   explain    Explain why a vulnerability applies or not
+  info       Show environment and data status
+  doctor     Run environment and data health checks
   version    Print version information
   help       Show this help message
 
