@@ -135,3 +135,53 @@ func TestParseSyncArgsLive(t *testing.T) {
 		t.Fatal("Live should be true")
 	}
 }
+
+func TestParseSyncArgsCVE(t *testing.T) {
+	got, err := parseSyncArgs([]string{"--cve", "CVE-2021-41773", "--cve", "CVE-2021-42013"})
+	if err != nil {
+		t.Fatalf("parseSyncArgs: %v", err)
+	}
+	if len(got.CVEIDs) != 2 || got.CVEIDs[0] != "CVE-2021-41773" || got.CVEIDs[1] != "CVE-2021-42013" {
+		t.Fatalf("CVEIDs = %v", got.CVEIDs)
+	}
+}
+
+func TestParseSyncArgsFromStore(t *testing.T) {
+	got, err := parseSyncArgs([]string{"--from-store"})
+	if err != nil {
+		t.Fatalf("parseSyncArgs: %v", err)
+	}
+	if !got.FromStore {
+		t.Fatal("FromStore should be true")
+	}
+}
+
+func TestParseSyncArgsLimit(t *testing.T) {
+	got, err := parseSyncArgs([]string{"--limit", "50"})
+	if err != nil {
+		t.Fatalf("parseSyncArgs: %v", err)
+	}
+	if got.Limit != 50 {
+		t.Fatalf("Limit = %d", got.Limit)
+	}
+}
+
+func TestParseSyncArgsLimitInvalid(t *testing.T) {
+	for _, bad := range []string{"-1", "abc"} {
+		t.Run(bad, func(t *testing.T) {
+			if _, err := parseSyncArgs([]string{"--limit", bad}); err == nil {
+				t.Fatalf("expected error for --limit %q", bad)
+			}
+		})
+	}
+}
+
+func TestParseSyncArgsInterval(t *testing.T) {
+	got, err := parseSyncArgs([]string{"--interval", "500ms"})
+	if err != nil {
+		t.Fatalf("parseSyncArgs: %v", err)
+	}
+	if got.Interval.Milliseconds() != 500 {
+		t.Fatalf("Interval = %v", got.Interval)
+	}
+}
