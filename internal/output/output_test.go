@@ -167,3 +167,61 @@ func TestRenderHumanWithoutKEV(t *testing.T) {
 		t.Fatalf("KEV line should not appear without KnownExploited:\n%s", buf.String())
 	}
 }
+func TestRenderJSONLBasic(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderJSONL(&buf, sampleReport()); err != nil {
+		t.Fatalf("RenderJSONL: %v", err)
+	}
+	raw := strings.TrimSpace(buf.String())
+	if raw == "" {
+		t.Fatal("expected at least one line")
+	}
+	lines := strings.Split(raw, "\n")
+	if len(lines) != 1 {
+		t.Fatalf("expected 1 line, got %d", len(lines))
+	}
+	var parsed struct {
+		Target  domain.Target  `json:"target"`
+		Finding domain.Finding `json:"finding"`
+	}
+	if err := json.Unmarshal([]byte(lines[0]), &parsed); err != nil {
+		t.Fatalf("invalid JSON line: %v\n%s", err, lines[0])
+	}
+	if parsed.Finding.VulnerabilityID != "CVE-2021-41773" {
+		t.Fatalf("VulnerabilityID = %q", parsed.Finding.VulnerabilityID)
+	}
+}
+
+func TestRenderJSONLMultipleFindings(t *testing.T) {
+	report := sampleReport()
+	report.Findings = append(report.Findings, domain.Finding{
+		VulnerabilityID: "CVE-2021-42013",
+		Status:          domain.FindingStatusAffected,
+		Confidence:      domain.ConfidenceStrong,
+	})
+
+	var buf bytes.Buffer
+	if err := RenderJSONL(&buf, report); err != nil {
+		t.Fatalf("RenderJSONL: %v", err)
+	}
+	lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d", len(lines))
+	}
+	for _, line := range lines {
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(line), &parsed); err != nil {
+			t.Fatalf("invalid JSON line: %v", err)
+		}
+	}
+}
+
+func TestRenderJSONLEmpty(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderJSONL(&buf, domain.Report{}); err != nil {
+		t.Fatalf("RenderJSONL: %v", err)
+	}
+	if buf.Len() != 0 {
+		t.Fatalf("expected empty output, got: %q", buf.String())
+	}
+}

@@ -89,3 +89,13 @@ func TestDetectPURLNotRejected(t *testing.T) {
 		t.Fatalf("detect --purl should not error, got: %v", err)
 	}
 }
+
+func TestValidateDetectFlagsAcceptsJSONL(t *testing.T) {
+	err := validateDetectFlags(detectFlags{
+		CPE:    "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*",
+		Output: "jsonl",
+	})
+	if err != nil {
+		t.Fatalf("jsonl should be accepted, got: %v", err)
+	}
+}
