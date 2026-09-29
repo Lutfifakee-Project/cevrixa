@@ -101,7 +101,6 @@ func RenderExplainHumanWithOptions(w io.Writer, r ExplainReport, opts RenderOpti
 		fmt.Fprintln(w, "Confidence")
 		fmt.Fprintf(w, "  %s\n", strings.ToUpper(r.Confidence))
 	}
-
 	return nil
 }
 

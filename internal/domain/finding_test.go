@@ -62,6 +62,10 @@ func TestIsSeverityAtLeast(t *testing.T) {
 		{"kev with kev", affKEV, "kev", true},
 		{"kev without kev", aff, "kev", false},
 		{"unknown threshold", aff, "bogus", false},
+		{"uppercase AFFECTED", aff, "AFFECTED", true},
+		{"mixed case Affected", aff, "Affected", true},
+		{"uppercase KEV", affKEV, "KEV", true},
+		{"uppercase ANY", na, "ANY", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -345,3 +345,36 @@ func TestRenderHumanWithEnrichment(t *testing.T) {
 		}
 	}
 }
+
+func TestRenderHumanWithAttribution(t *testing.T) {
+	report := sampleReport()
+	report.Findings[0].Enrichment = &domain.Enrichment{
+		Source:      "dbcve",
+		Mitigation:  "upgrade",
+		Attribution: &domain.Attribution{Source: "dbcve.org", License: "CC-BY-4.0"},
+	}
+
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, report); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Enrichment data:") {
+		t.Fatalf("expected attribution footer:\n%s", out)
+	}
+	if !strings.Contains(out, "dbcve.org") || !strings.Contains(out, "CC-BY-4.0") {
+		t.Fatalf("attribution not rendered correctly:\n%s", out)
+	}
+}
+
+func TestRenderHumanNoAttributionWithoutEnrichment(t *testing.T) {
+	report := sampleReport()
+
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, report); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	if strings.Contains(buf.String(), "Enrichment data:") {
+		t.Fatalf("attribution footer should not appear without enrichment:\n%s", buf.String())
+	}
+}

@@ -72,3 +72,17 @@ func openStoreIfDB(dbPath string) (*store.Store, error) {
 	}
 	return s, nil
 }
+
+func resolveDBPath(requested string) string {
+	if requested != "" {
+		return requested
+	}
+	p, err := defaultDBPath()
+	if err != nil {
+		return ""
+	}
+	if _, err := os.Stat(p); err != nil {
+		return ""
+	}
+	return p
+}

@@ -85,7 +85,7 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 		}
 		fmt.Fprintf(w, "  Evidence   : %d\n", len(f.Evidence))
 	}
-
+	printAttributionFooter(w, r.Findings)
 	return nil
 }
 
@@ -96,4 +96,36 @@ func renderHumanQuiet(w io.Writer, r domain.Report) error {
 		}
 	}
 	return nil
+}
+func printAttributionFooter(w io.Writer, findings []domain.Finding) {
+	attr := ""
+	for _, f := range findings {
+		if a := enrichmentAttribution(f.Enrichment); a != "" {
+			attr = a
+			break
+		}
+	}
+	if attr == "" {
+		return
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "Enrichment data: %s\n", attr)
+}
+
+func enrichmentAttribution(e *domain.Enrichment) string {
+	if e == nil {
+		return ""
+	}
+	if e.Attribution != nil && e.Attribution.Source != "" {
+		s := e.Attribution.Source
+		if e.Attribution.License != "" {
+			s += " (" + e.Attribution.License + ")"
+		}
+		return s
+	}
+	switch e.Source {
+	case "dbcve":
+		return "dbcve.org (CC-BY-4.0)"
+	}
+	return ""
 }

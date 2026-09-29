@@ -47,8 +47,10 @@ func runExplain(args []string) error {
 	}
 	target.ResolvedCPE = res.CPE
 
+	dbPath := resolveDBPath(flags.DB)
+
 	opts := engine.Options{}
-	if s, err := openStoreIfDB(flags.DB); err != nil {
+	if s, err := openStoreIfDB(dbPath); err != nil {
 		return fmt.Errorf("explain: %w", err)
 	} else if s != nil {
 		defer s.Close()

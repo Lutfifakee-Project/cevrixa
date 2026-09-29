@@ -1,5 +1,7 @@
 package domain
 
+import "strings"
+
 type FindingStatus string
 
 const (
@@ -51,16 +53,8 @@ type Report struct {
 	Findings []Finding `json:"findings"`
 }
 
-// IsSeverityAtLeast reports whether the finding matches or exceeds the
-// given threshold. Recognized thresholds (case-sensitive):
-//
-//	any       — any finding
-//	affected  — only AFFECTED / CONFLICT
-//	kev       — only findings with KnownExploited set
-//
-// An empty or unrecognized threshold returns false.
 func (f Finding) IsSeverityAtLeast(threshold string) bool {
-	switch threshold {
+	switch strings.ToLower(threshold) {
 	case "", "none":
 		return false
 	case "any":

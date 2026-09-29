@@ -41,14 +41,23 @@ func runDetect(args []string) error {
 		PURL:    flags.PURL,
 	}
 
+	dbPath := resolveDBPath(flags.DB)
+
 	opts := engine.Options{}
 	if flags.WithKEV {
-		entries, src, err := loadKEV(true, flags.DB)
+		entries, src, err := loadKEV(true, dbPath)
 		if err != nil {
 			return fmt.Errorf("detect: %w", err)
 		}
 		opts.KEV = entries
 		opts.Source = src
+	}
+
+	if s, err := openStoreIfDB(dbPath); err != nil {
+		return fmt.Errorf("detect: %w", err)
+	} else if s != nil {
+		defer s.Close()
+		opts.Store = s
 	}
 
 	if s, err := openStoreIfDB(flags.DB); err != nil {
