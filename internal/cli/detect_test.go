@@ -13,13 +13,13 @@ func TestValidateDetectFlags(t *testing.T) {
 	}{
 		{"product+version ok", detectFlags{Product: "Apache", Version: "2.4.49"}, false},
 		{"cpe ok", detectFlags{CPE: "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"}, false},
-		{"purl ok", detectFlags{PURL: "pkg:pypi/django@4.2.0"}, false},
+		{"purl ok at validation", detectFlags{PURL: "pkg:pypi/django@4.2.0"}, false},
 		{"no identity", detectFlags{}, true},
 		{"product without version", detectFlags{Product: "Apache"}, true},
 		{"version without product", detectFlags{Version: "2.4.49"}, true},
 		{"multiple identities", detectFlags{Product: "Apache", Version: "2.4.49", CPE: "cpe:2.3:a:x:y:1:*:*:*:*:*:*:*"}, true},
+		{"bad output", detectFlags{CPE: "cpe:2.3:a:x:y:1:*:*:*:*:*:*:*", Output: "xml"}, true},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateDetectFlags(tt.in)
@@ -39,12 +39,10 @@ func TestParseDetectArgs(t *testing.T) {
 	}{
 		{"space form", []string{"--product", "Apache", "--version", "2.4.49"}, detectFlags{Product: "Apache", Version: "2.4.49"}, false},
 		{"equals form", []string{"--product=Apache", "--version=2.4.49"}, detectFlags{Product: "Apache", Version: "2.4.49"}, false},
-		{"cpe", []string{"--cpe", "cpe:2.3:a:x:y:1.0:*:*:*:*:*:*:*"}, detectFlags{CPE: "cpe:2.3:a:x:y:1.0:*:*:*:*:*:*:*"}, false},
-		{"purl", []string{"--purl=pkg:pypi/django@4.2.0"}, detectFlags{PURL: "pkg:pypi/django@4.2.0"}, false},
+		{"with output", []string{"--cpe", "cpe:2.3:a:x:y:1:*:*:*:*:*:*:*", "--output", "json"}, detectFlags{CPE: "cpe:2.3:a:x:y:1:*:*:*:*:*:*:*", Output: "json"}, false},
 		{"unknown flag", []string{"--bogus", "x"}, detectFlags{}, true},
 		{"missing value", []string{"--product"}, detectFlags{}, true},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := parseDetectArgs(tt.args)
@@ -61,8 +59,6 @@ func TestParseDetectArgs(t *testing.T) {
 	}
 }
 
-// TestDetectHelpReturnsNoError guards the CLI contract:
-// `cevrixa detect --help` must exit cleanly (exit code 0).
 func TestDetectHelpReturnsNoError(t *testing.T) {
 	if err := runDetect([]string{"--help"}); err != nil {
 		t.Fatalf("detect --help should return nil, got: %v", err)
@@ -72,11 +68,9 @@ func TestDetectHelpReturnsNoError(t *testing.T) {
 	}
 }
 
-// TestDetectNotImplemented guards the anti-fabrication contract:
-// detect must return errNotImplemented rather than pretending to succeed.
-func TestDetectNotImplemented(t *testing.T) {
-	err := runDetect([]string{"--product", "Apache", "--version", "2.4.49"})
+func TestDetectPURLNotImplemented(t *testing.T) {
+	err := runDetect([]string{"--purl", "pkg:pypi/django@4.2.0"})
 	if !errors.Is(err, errNotImplemented) {
-		t.Fatalf("detect should return errNotImplemented, got: %v", err)
+		t.Fatalf("detect --purl should return errNotImplemented, got: %v", err)
 	}
 }

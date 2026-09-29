@@ -24,11 +24,11 @@ const (
 )
 
 type Evidence struct {
-	Kind   EvidenceKind
-	Source string
-	Value  string
+	Kind   EvidenceKind `json:"kind"`
+	Source string       `json:"source"`
+	Value  string       `json:"value,omitempty"`
 
-	Reference     *Reference
-	Range         *PackageRange
-	Applicability *ApplicabilityNode
+	Reference     *Reference         `json:"reference,omitempty"`
+	Range         *PackageRange      `json:"range,omitempty"`
+	Applicability *ApplicabilityNode `json:"applicability,omitempty"`
 }
