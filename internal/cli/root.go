@@ -5,6 +5,8 @@ import (
 	"fmt"
 )
 
+var errNotImplemented = errors.New("not implemented in this milestone")
+
 // Run dispatches a command-line invocation to the appropriate command.
 func Run(args []string) error {
 	if len(args) == 0 {
@@ -19,10 +21,12 @@ func Run(args []string) error {
 		return runDetect(args[1:])
 	case "scan":
 		return runScan(args[1:])
-	case "sync":
-		return runSync(args[1:])
 	case "sbom":
 		return runSBOM(args[1:])
+	case "sync":
+		return runSync(args[1:])
+	case "explain":
+		return runExplain(args[1:])
 	case "help", "-h", "--help":
 		printUsage()
 		return nil
@@ -41,10 +45,11 @@ Usage:
 Commands:
   detect     Detect whether a single target is affected
   scan       Read multiple targets from a file or stdin
+  sbom       Read a CycloneDX SBOM and detect affected components
+  sync       Download and persist vulnerability data to local store
+  explain    Explain why a vulnerability applies or not
   version    Print version information
   help       Show this help message
 
 Run 'cevrixa <command> --help' for more information on a command.`)
 }
-
-var errNotImplemented = errors.New("not implemented in this milestone")

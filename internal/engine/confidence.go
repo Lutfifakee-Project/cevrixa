@@ -9,10 +9,13 @@ func computeConfidence(mr matcher.Result) domain.FindingConfidence {
 	if !mr.Matched {
 		return domain.ConfidenceUnknown
 	}
-	return confidenceFromMode(mr.Mode)
+	return ConfidenceFromMode(mr.Mode)
 }
 
-func confidenceFromMode(mode string) domain.FindingConfidence {
+// ConfidenceFromMode maps a matcher mode string to a FindingConfidence value.
+// Exported so callers outside the engine (e.g. the explain command) can
+// reuse the same classification.
+func ConfidenceFromMode(mode string) domain.FindingConfidence {
 	switch mode {
 	case "exact":
 		return domain.ConfidenceExact
