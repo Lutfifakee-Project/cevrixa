@@ -156,3 +156,39 @@ func TestDetectConflictsScalarContract(t *testing.T) {
 		})
 	}
 }
+func TestDetectConflictsSameSourceNotConflict(t *testing.T) {
+	ev := []domain.Evidence{
+		{Kind: domain.EvidenceKindSeverity, Source: "a", Value: "HIGH"},
+		{Kind: domain.EvidenceKindSeverity, Source: "a", Value: "CRITICAL"},
+	}
+	got := detectConflicts(ev)
+	if len(got) != 0 {
+		t.Fatalf("same-source disagreement is not a cross-source conflict, got %+v", got)
+	}
+}
+
+func TestDetectConflictsSameSourceRepeatedValueNotConflict(t *testing.T) {
+	ev := []domain.Evidence{
+		{Kind: domain.EvidenceKindStatus, Source: "nvd", Value: "Analyzed"},
+		{Kind: domain.EvidenceKindStatus, Source: "nvd", Value: "Analyzed"},
+	}
+	got := detectConflicts(ev)
+	if len(got) != 0 {
+		t.Fatalf("repeated same value must not conflict, got %+v", got)
+	}
+}
+
+func TestDetectConflictsMixedSourcesStillConflict(t *testing.T) {
+	ev := []domain.Evidence{
+		{Kind: domain.EvidenceKindSeverity, Source: "a", Value: "HIGH"},
+		{Kind: domain.EvidenceKindSeverity, Source: "a", Value: "CRITICAL"},
+		{Kind: domain.EvidenceKindSeverity, Source: "b", Value: "HIGH"},
+	}
+	got := detectConflicts(ev)
+	if len(got) != 1 || got[0].Kind != domain.EvidenceKindSeverity {
+		t.Fatalf("expected severity conflict across distinct sources, got %+v", got)
+	}
+	if len(got[0].Values) != 3 {
+		t.Fatalf("expected all three values preserved, got %d", len(got[0].Values))
+	}
+}

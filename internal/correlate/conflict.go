@@ -58,6 +58,9 @@ func detectConflicts(evidence []domain.Evidence) []domain.Conflict {
 		if b == nil || len(b.values) < 2 {
 			continue
 		}
+		if !hasMultipleSources(b.values) {
+			continue
+		}
 		first := b.values[0].Value
 		allEqual := true
 		for _, v := range b.values[1:] {
@@ -75,6 +78,14 @@ func detectConflicts(evidence []domain.Evidence) []domain.Conflict {
 		})
 	}
 	return out
+}
+
+func hasMultipleSources(values []domain.ConflictValue) bool {
+	seen := make(map[string]struct{}, len(values))
+	for _, v := range values {
+		seen[v.Source] = struct{}{}
+	}
+	return len(seen) >= 2
 }
 
 func cvssGroupKey(all []domain.Evidence, target domain.Evidence) string {
