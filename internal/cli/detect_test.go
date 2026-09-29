@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"errors"
 	"testing"
 )
 
@@ -40,6 +39,7 @@ func TestParseDetectArgs(t *testing.T) {
 		{"space form", []string{"--product", "Apache", "--version", "2.4.49"}, detectFlags{Product: "Apache", Version: "2.4.49"}, false},
 		{"equals form", []string{"--product=Apache", "--version=2.4.49"}, detectFlags{Product: "Apache", Version: "2.4.49"}, false},
 		{"with output", []string{"--cpe", "cpe:2.3:a:x:y:1:*:*:*:*:*:*:*", "--output", "json"}, detectFlags{CPE: "cpe:2.3:a:x:y:1:*:*:*:*:*:*:*", Output: "json"}, false},
+		{"with kev", []string{"--cpe", "cpe:2.3:a:x:y:1:*:*:*:*:*:*:*", "--with-kev"}, detectFlags{CPE: "cpe:2.3:a:x:y:1:*:*:*:*:*:*:*", WithKEV: true}, false},
 		{"unknown flag", []string{"--bogus", "x"}, detectFlags{}, true},
 		{"missing value", []string{"--product"}, detectFlags{}, true},
 	}
@@ -68,12 +68,6 @@ func TestDetectHelpReturnsNoError(t *testing.T) {
 	}
 }
 
-func TestDetectPURLNotImplemented(t *testing.T) {
-	err := runDetect([]string{"--purl", "pkg:pypi/django@4.2.0"})
-	if !errors.Is(err, errNotImplemented) {
-		t.Fatalf("detect --purl should return errNotImplemented, got: %v", err)
-	}
-}
 func TestParseDetectArgsWithKEV(t *testing.T) {
 	got, err := parseDetectArgs([]string{
 		"--product", "Apache", "--version", "2.4.49", "--with-kev",
@@ -86,5 +80,12 @@ func TestParseDetectArgsWithKEV(t *testing.T) {
 	}
 	if got.Product != "Apache" || got.Version != "2.4.49" {
 		t.Fatalf("got %+v", got)
+	}
+}
+
+func TestDetectPURLNotRejected(t *testing.T) {
+	err := runDetect([]string{"--purl", "pkg:pypi/django@4.2.0"})
+	if err != nil {
+		t.Fatalf("detect --purl should not error, got: %v", err)
 	}
 }

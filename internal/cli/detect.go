@@ -31,14 +31,11 @@ func runDetect(args []string) error {
 		return err
 	}
 
-	if flags.PURL != "" {
-		return fmt.Errorf("detect: %w (PURL support is planned for a later milestone)", errNotImplemented)
-	}
-
 	target := domain.Target{
 		Product: flags.Product,
 		Version: flags.Version,
 		CPE:     flags.CPE,
+		PURL:    flags.PURL,
 	}
 
 	opts := engine.Options{}
@@ -162,7 +159,7 @@ Flags:
   --product <name>     Product name (requires --version)
   --version <ver>      Product version
   --cpe <cpe>          CPE 2.3 identifier
-  --purl <purl>        Package URL (not yet implemented)
+  --purl <purl>        Package URL (e.g. pkg:pypi/django@4.2.0)
   --with-kev           Enrich findings with CISA KEV data
   --output <fmt>       Output format: human (default) or json
   -h, --help           Show this help
@@ -170,6 +167,6 @@ Flags:
 Examples:
   cevrixa detect --product "Apache HTTP Server" --version "2.4.49"
   cevrixa detect --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
-  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --with-kev
-  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --output json`)
+  cevrixa detect --purl "pkg:pypi/django@4.2.0"
+  cevrixa detect --purl "pkg:pypi/django@4.2.0" --output json`)
 }

@@ -1,0 +1,22 @@
+{
+  "id": "GHSA-lodash-1",
+  "source": "osv",
+  "summary": "lodash command injection via template",
+  "aliases": ["CVE-2021-23337"],
+  "package_applicability": [
+    {
+      "name": "lodash",
+      "ecosystem": "npm",
+      "purl": "pkg:npm/lodash",
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {"introduced": "0"},
+            {"fixed": "4.17.21"}
+          ]
+        }
+      ]
+    }
+  ]
+}

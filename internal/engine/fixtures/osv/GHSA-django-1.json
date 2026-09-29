@@ -1,0 +1,22 @@
+{
+  "id": "GHSA-django-1",
+  "source": "osv",
+  "summary": "Django Denial-of-Service in django.utils.text.Truncator",
+  "aliases": ["CVE-2024-27351"],
+  "package_applicability": [
+    {
+      "name": "django",
+      "ecosystem": "PyPI",
+      "purl": "pkg:pypi/django",
+      "ranges": [
+        {
+          "type": "ECOSYSTEM",
+          "events": [
+            {"introduced": "0"},
+            {"fixed": "4.2.10"}
+          ]
+        }
+      ]
+    }
+  ]
+}

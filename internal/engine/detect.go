@@ -13,6 +13,13 @@ type Options struct {
 }
 
 func Detect(target domain.Target, opts Options) (domain.Report, error) {
+	if target.PURL != "" {
+		return detectByPURL(target, opts)
+	}
+	return detectByCPE(target, opts)
+}
+
+func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 	r := resolver.New()
 	res, err := r.Resolve(target)
 	if err != nil {
@@ -44,14 +51,53 @@ func Detect(target domain.Target, opts Options) (domain.Report, error) {
 			continue
 		}
 		f := buildFinding(targetCPE, v, mr)
-		if opts.KEV != nil {
-			if info, ok := opts.KEV[v.ID]; ok {
-				infoCopy := info
-				f.KnownExploited = &infoCopy
-			}
-		}
+		attachKEV(&f, v.ID, opts)
 		findings = append(findings, f)
 	}
 
 	return domain.Report{Target: target, Findings: findings}, nil
+}
+
+func detectByPURL(target domain.Target, opts Options) (domain.Report, error) {
+	purl, err := domain.ParsePURL(target.PURL)
+	if err != nil {
+		return domain.Report{}, fmt.Errorf("engine: parse PURL: %w", err)
+	}
+	if purl.Version == "" {
+		return domain.Report{}, fmt.Errorf("engine: PURL must include a version")
+	}
+
+	vulns, err := loadFixturesFromEmbed()
+	if err != nil {
+		return domain.Report{}, err
+	}
+
+	findings := []domain.Finding{}
+	for _, v := range vulns {
+		if len(v.PackageApplicability) == 0 {
+			continue
+		}
+		pr, ok := matchPackage(purl, v)
+		if !ok {
+			continue
+		}
+		if !pr.Matched {
+			continue
+		}
+		f := buildPackageFinding(purl, v, pr)
+		attachKEV(&f, v.ID, opts)
+		findings = append(findings, f)
+	}
+
+	return domain.Report{Target: target, Findings: findings}, nil
+}
+
+func attachKEV(f *domain.Finding, cveID string, opts Options) {
+	if opts.KEV == nil {
+		return
+	}
+	if info, ok := opts.KEV[cveID]; ok {
+		infoCopy := info
+		f.KnownExploited = &infoCopy
+	}
 }

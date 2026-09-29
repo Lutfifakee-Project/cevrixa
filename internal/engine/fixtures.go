@@ -12,10 +12,19 @@ import (
 )
 
 //go:embed fixtures/cve/*.json
+//go:embed fixtures/osv/*.json
 var embeddedFixtures embed.FS
 
 func loadFixturesFromEmbed() ([]domain.Vulnerability, error) {
-	return loadFixturesFS(embeddedFixtures, "fixtures/cve")
+	cveVulns, err := loadFixturesFS(embeddedFixtures, "fixtures/cve")
+	if err != nil {
+		return nil, err
+	}
+	osvVulns, err := loadFixturesFS(embeddedFixtures, "fixtures/osv")
+	if err != nil {
+		return nil, err
+	}
+	return append(cveVulns, osvVulns...), nil
 }
 
 func loadFixturesFS(fsys fs.FS, dir string) ([]domain.Vulnerability, error) {
