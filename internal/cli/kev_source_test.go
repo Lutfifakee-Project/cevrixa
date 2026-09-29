@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -81,5 +82,43 @@ func TestLoadKEVFallsBackWhenDBMissing(t *testing.T) {
 	}
 	if len(entries) == 0 {
 		t.Fatal("expected embedded entries")
+	}
+}
+
+func TestOpenStoreIfDBEmpty(t *testing.T) {
+	s, err := openStoreIfDB("")
+	if err != nil {
+		t.Fatalf("openStoreIfDB empty: %v", err)
+	}
+	if s != nil {
+		t.Fatal("expected nil store for empty path")
+	}
+}
+
+func TestOpenStoreIfDBMissing(t *testing.T) {
+	s, err := openStoreIfDB(filepath.Join(t.TempDir(), "missing.db"))
+	if err != nil {
+		t.Fatalf("openStoreIfDB missing: %v", err)
+	}
+	if s != nil {
+		t.Fatal("expected nil store for missing file")
+	}
+}
+
+func TestOpenStoreIfDBExisting(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "x.db")
+	if err := syncKEV(dbPath); err != nil {
+		t.Fatalf("syncKEV: %v", err)
+	}
+	s, err := openStoreIfDB(dbPath)
+	if err != nil {
+		t.Fatalf("openStoreIfDB: %v", err)
+	}
+	if s == nil {
+		t.Fatal("expected non-nil store")
+	}
+	defer s.Close()
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Fatalf("db file: %v", err)
 	}
 }

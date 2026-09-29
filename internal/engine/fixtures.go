@@ -27,6 +27,24 @@ func loadFixturesFromEmbed() ([]domain.Vulnerability, error) {
 	return append(cveVulns, osvVulns...), nil
 }
 
+// loadVulnerabilities returns vulnerability records from the store when
+// available and non-empty, falling back to the embedded fixtures otherwise.
+//
+// This is the single switch that determines whether detect operates on
+// live-synced data or the built-in sample set.
+func loadVulnerabilities(opts Options) ([]domain.Vulnerability, error) {
+	if opts.Store != nil {
+		vulns, err := opts.Store.ListVulnerabilities()
+		if err != nil {
+			return nil, fmt.Errorf("engine: list from store: %w", err)
+		}
+		if len(vulns) > 0 {
+			return vulns, nil
+		}
+	}
+	return loadFixturesFromEmbed()
+}
+
 func loadFixturesFS(fsys fs.FS, dir string) ([]domain.Vulnerability, error) {
 	entries, err := fs.ReadDir(fsys, dir)
 	if err != nil {

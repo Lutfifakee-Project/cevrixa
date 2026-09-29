@@ -45,6 +45,12 @@ func runScan(args []string) error {
 		opts.KEV = entries
 		opts.Source = src
 	}
+	if s, err := openStoreIfDB(flags.DB); err != nil {
+		return fmt.Errorf("scan: %w", err)
+	} else if s != nil {
+		defer s.Close()
+		opts.Store = s
+	}
 
 	reports := make([]domain.Report, 0, len(targets))
 	for _, t := range targets {

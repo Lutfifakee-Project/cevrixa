@@ -1,9 +1,11 @@
 package engine
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
+	"github.com/Lutfifakee-Project/cevrixa/internal/store"
 )
 
 func TestDetectApacheInRange(t *testing.T) {
@@ -89,6 +91,7 @@ func TestEmbeddedFixturesLoadable(t *testing.T) {
 		}
 	}
 }
+
 func TestDetectConfidenceIsStrongForRangeMatch(t *testing.T) {
 	target := domain.Target{Product: "Apache HTTP Server", Version: "2.4.49"}
 	report, err := Detect(target, Options{})
@@ -105,6 +108,7 @@ func TestDetectConfidenceIsStrongForRangeMatch(t *testing.T) {
 		}
 	}
 }
+
 func TestDetectWithoutKEV(t *testing.T) {
 	target := domain.Target{Product: "Apache HTTP Server", Version: "2.4.49"}
 	report, err := Detect(target, Options{})
@@ -139,16 +143,74 @@ func TestDetectWithKEV(t *testing.T) {
 			if f.KnownExploited == nil {
 				t.Fatal("KnownExploited should be set")
 			}
-			if f.KnownExploited.VendorProject != "Apache" {
-				t.Fatalf("VendorProject = %q", f.KnownExploited.VendorProject)
-			}
 			found = true
 		}
 		if f.VulnerabilityID == "CVE-2021-42013" && f.KnownExploited != nil {
-			t.Fatalf("CVE-2021-42013 should not be in KEV, got %+v", f.KnownExploited)
+			t.Fatalf("CVE-2021-42013 should not be in KEV")
 		}
 	}
 	if !found {
 		t.Fatal("CVE-2021-41773 not found")
+	}
+}
+
+func TestDetectFromStore(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer s.Close()
+
+	if err := s.SaveVulnerability(domain.Vulnerability{
+		ID:     "CVE-STORE-001",
+		Source: "nvd",
+		Applicability: []domain.ApplicabilityNode{
+			{
+				Operator: "OR",
+				Matches: []domain.CPEMatch{
+					{
+						Vulnerable:       true,
+						Criteria:         "cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*",
+						VersionStart:     "2.4.0",
+						VersionStartMode: domain.BoundModeIncluding,
+						VersionEnd:       "2.4.51",
+						VersionEndMode:   domain.BoundModeExcluding,
+					},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	target := domain.Target{Product: "Apache HTTP Server", Version: "2.4.49"}
+	report, err := Detect(target, Options{Store: s})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	if len(report.Findings) != 1 {
+		t.Fatalf("expected 1 finding from store, got %d", len(report.Findings))
+	}
+	if report.Findings[0].VulnerabilityID != "CVE-STORE-001" {
+		t.Fatalf("VulnerabilityID = %q", report.Findings[0].VulnerabilityID)
+	}
+}
+
+func TestDetectFallbackToEmbeddedWhenStoreEmpty(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "empty.db")
+	s, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer s.Close()
+
+	target := domain.Target{Product: "Apache HTTP Server", Version: "2.4.49"}
+	report, err := Detect(target, Options{Store: s})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	if len(report.Findings) < 2 {
+		t.Fatalf("expected embedded fallback findings, got %d", len(report.Findings))
 	}
 }

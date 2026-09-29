@@ -83,13 +83,6 @@ func TestParseDetectArgsWithKEV(t *testing.T) {
 	}
 }
 
-func TestDetectPURLNotRejected(t *testing.T) {
-	err := runDetect([]string{"--purl", "pkg:pypi/django@4.2.0"})
-	if err != nil {
-		t.Fatalf("detect --purl should not error, got: %v", err)
-	}
-}
-
 func TestValidateDetectFlagsAcceptsJSONL(t *testing.T) {
 	err := validateDetectFlags(detectFlags{
 		CPE:    "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*",
@@ -109,5 +102,12 @@ func TestParseDetectArgsFailOn(t *testing.T) {
 	}
 	if got.FailOn != "affected" {
 		t.Fatalf("FailOn = %q", got.FailOn)
+	}
+}
+
+func TestDetectPURLNotRejected(t *testing.T) {
+	err := runDetect([]string{"--purl", "pkg:pypi/django@4.2.0"})
+	if err != nil {
+		t.Fatalf("detect --purl should not error, got: %v", err)
 	}
 }

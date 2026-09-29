@@ -6,11 +6,13 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/matcher"
 	"github.com/Lutfifakee-Project/cevrixa/internal/resolver"
+	"github.com/Lutfifakee-Project/cevrixa/internal/store"
 )
 
 type Options struct {
 	KEV    map[string]domain.KEVInfo
 	Source string
+	Store  *store.Store
 }
 
 func Detect(target domain.Target, opts Options) (domain.Report, error) {
@@ -37,7 +39,7 @@ func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 		return domain.Report{}, fmt.Errorf("engine: parse resolved CPE: %w", err)
 	}
 
-	vulns, err := loadFixturesFromEmbed()
+	vulns, err := loadVulnerabilities(opts)
 	if err != nil {
 		return domain.Report{}, err
 	}
@@ -68,7 +70,7 @@ func detectByPURL(target domain.Target, opts Options) (domain.Report, error) {
 		return domain.Report{}, fmt.Errorf("engine: PURL must include a version")
 	}
 
-	vulns, err := loadFixturesFromEmbed()
+	vulns, err := loadVulnerabilities(opts)
 	if err != nil {
 		return domain.Report{}, err
 	}

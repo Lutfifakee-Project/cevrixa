@@ -49,6 +49,13 @@ func runDetect(args []string) error {
 		opts.Source = src
 	}
 
+	if s, err := openStoreIfDB(flags.DB); err != nil {
+		return fmt.Errorf("detect: %w", err)
+	} else if s != nil {
+		defer s.Close()
+		opts.Store = s
+	}
+
 	report, err := engine.Detect(target, opts)
 	if err != nil {
 		return fmt.Errorf("detect: %w", err)

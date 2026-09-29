@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -117,7 +118,7 @@ func syncNVDRemote(dbPath string, days int) error {
 	}
 	defer s.Close()
 
-	client := nvd.NewClient(nil)
+	client := nvd.NewClient(&http.Client{Timeout: 120 * time.Second})
 
 	end := time.Now().UTC().Format("2006-01-02T15:04:05.000")
 	start := time.Now().UTC().AddDate(0, 0, -days).Format("2006-01-02T15:04:05.000")

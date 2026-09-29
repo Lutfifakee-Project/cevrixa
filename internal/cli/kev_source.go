@@ -56,3 +56,19 @@ func defaultKEVDBPath() string {
 	}
 	return filepath.Join(home, ".cevrixa", "cevrixa.db")
 }
+func openStoreIfDB(dbPath string) (*store.Store, error) {
+	if dbPath == "" {
+		return nil, nil
+	}
+	if _, err := os.Stat(dbPath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("stat db: %w", err)
+	}
+	s, err := store.Open(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("open db: %w", err)
+	}
+	return s, nil
+}
