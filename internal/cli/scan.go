@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/engine"
 	"github.com/Lutfifakee-Project/cevrixa/internal/output"
-	"github.com/Lutfifakee-Project/cevrixa/internal/source/kev"
 )
 
 type scanFlags struct {
@@ -19,6 +19,7 @@ type scanFlags struct {
 	Output  string
 	WithKEV bool
 	FailOn  string
+	DB      string
 }
 
 func runScan(args []string) error {
@@ -37,11 +38,12 @@ func runScan(args []string) error {
 
 	opts := engine.Options{}
 	if flags.WithKEV {
-		cat, err := kev.LoadEmbedded()
+		entries, src, err := loadKEV(true, flags.DB)
 		if err != nil {
-			return fmt.Errorf("scan: load KEV catalog: %w", err)
+			return fmt.Errorf("scan: %w", err)
 		}
-		opts.KEV = cat.Entries
+		opts.KEV = entries
+		opts.Source = src
 	}
 
 	reports := make([]domain.Report, 0, len(targets))
@@ -55,16 +57,35 @@ func runScan(args []string) error {
 
 	switch flags.Output {
 	case "", "human":
-		return output.RenderScanHuman(os.Stdout, reports)
+		if err := output.RenderScanHuman(os.Stdout, reports); err != nil {
+			return err
+		}
 	case "json":
-		return output.RenderScanJSON(os.Stdout, reports)
+		if err := output.RenderScanJSON(os.Stdout, reports); err != nil {
+			return err
+		}
 	case "jsonl":
-		return output.RenderScanJSONL(os.Stdout, reports)
+		if err := output.RenderScanJSONL(os.Stdout, reports); err != nil {
+			return err
+		}
 	case "sarif":
-		return output.RenderScanSARIF(os.Stdout, reports, Version)
+		if err := output.RenderScanSARIF(os.Stdout, reports, Version); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("scan: unsupported --output %q", flags.Output)
 	}
+
+	if flags.FailOn != "" {
+		for _, r := range reports {
+			for _, f := range r.Findings {
+				if f.IsSeverityAtLeast(flags.FailOn) {
+					return fmt.Errorf("scan: fail-on %q triggered by %s", flags.FailOn, f.VulnerabilityID)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func parseScanArgs(args []string) (scanFlags, error) {
@@ -73,12 +94,10 @@ func parseScanArgs(args []string) (scanFlags, error) {
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
-		// Positional argument: input path or "-" for stdin.
 		if arg == "-" || (len(arg) > 0 && arg[0] != '-') {
 			f.Input = arg
 			continue
 		}
-
 		if arg == "-h" || arg == "--help" {
 			printScanUsage()
 			return scanFlags{}, errHelpRequested
@@ -100,10 +119,10 @@ func parseScanArgs(args []string) (scanFlags, error) {
 		switch key {
 		case "--output":
 			f.Output = value
-
 		case "--fail-on":
 			f.FailOn = value
-
+		case "--db":
+			f.DB = value
 		default:
 			return f, fmt.Errorf("scan: unknown flag %q", key)
 		}
@@ -134,7 +153,6 @@ func readTargets(input string) ([]domain.Target, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read input: %w", err)
 	}
-
 	if len(raw) == 0 {
 		return nil, errors.New("empty input")
 	}
@@ -147,16 +165,15 @@ func readTargets(input string) ([]domain.Target, error) {
 
 	// Fall back to JSONL (one object per line).
 	var targets []domain.Target
-	scanner := bufio.NewScanner(bytesReader(raw))
+	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 	for scanner.Scan() {
-		line := scanner.Bytes()
-		trimmed := trimSpace(line)
-		if len(trimmed) == 0 {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
 			continue
 		}
 		var t domain.Target
-		if err := json.Unmarshal(trimmed, &t); err != nil {
+		if err := json.Unmarshal(line, &t); err != nil {
 			return nil, fmt.Errorf("parse line: %w", err)
 		}
 		targets = append(targets, t)
@@ -170,36 +187,6 @@ func readTargets(input string) ([]domain.Target, error) {
 	return targets, nil
 }
 
-func bytesReader(b []byte) io.Reader {
-	return &sliceReader{data: b}
-}
-
-type sliceReader struct {
-	data []byte
-	pos  int
-}
-
-func (r *sliceReader) Read(p []byte) (int, error) {
-	if r.pos >= len(r.data) {
-		return 0, io.EOF
-	}
-	n := copy(p, r.data[r.pos:])
-	r.pos += n
-	return n, nil
-}
-
-func trimSpace(b []byte) []byte {
-	start := 0
-	for start < len(b) && (b[start] == ' ' || b[start] == '\t' || b[start] == '\r' || b[start] == '\n') {
-		start++
-	}
-	end := len(b)
-	for end > start && (b[end-1] == ' ' || b[end-1] == '\t' || b[end-1] == '\r' || b[end-1] == '\n') {
-		end--
-	}
-	return b[start:end]
-}
-
 func printScanUsage() {
 	fmt.Println(`Usage: cevrixa scan [input] [flags]
 
@@ -210,6 +197,8 @@ Arguments:
 
 Flags:
   --with-kev           Enrich findings with CISA KEV data
+  --db <path>          Read KEV from SQLite database (default: embedded)
+  --fail-on <level>    Exit non-zero if any finding matches: any, affected, kev
   --output <fmt>       Output format: human (default), json, jsonl, or sarif
   -h, --help           Show this help
 
@@ -221,5 +210,5 @@ Input formats:
 Examples:
   echo '[{"product": "Apache HTTP Server", "version": "2.4.49"}]' | cevrixa scan -
   cevrixa scan targets.json
-  cevrixa scan targets.json --output jsonl`)
+  cevrixa scan targets.json --with-kev --db ~/.cevrixa/cevrixa.db`)
 }

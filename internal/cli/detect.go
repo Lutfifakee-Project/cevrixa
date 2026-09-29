@@ -8,7 +8,6 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/engine"
 	"github.com/Lutfifakee-Project/cevrixa/internal/output"
-	"github.com/Lutfifakee-Project/cevrixa/internal/source/kev"
 )
 
 var errHelpRequested = errors.New("help requested")
@@ -21,6 +20,7 @@ type detectFlags struct {
 	Output  string
 	WithKEV bool
 	FailOn  string
+	DB      string
 }
 
 func runDetect(args []string) error {
@@ -41,11 +41,12 @@ func runDetect(args []string) error {
 
 	opts := engine.Options{}
 	if flags.WithKEV {
-		cat, err := kev.LoadEmbedded()
+		entries, src, err := loadKEV(true, flags.DB)
 		if err != nil {
-			return fmt.Errorf("detect: load KEV catalog: %w", err)
+			return fmt.Errorf("detect: %w", err)
 		}
-		opts.KEV = cat.Entries
+		opts.KEV = entries
+		opts.Source = src
 	}
 
 	report, err := engine.Detect(target, opts)
@@ -90,7 +91,6 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 			printDetectUsage()
 			return detectFlags{}, errHelpRequested
 		}
-
 		if arg == "--with-kev" {
 			f.WithKEV = true
 			continue
@@ -114,10 +114,12 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 			f.CPE = value
 		case "--purl":
 			f.PURL = value
-		case "--fail-on":
-			f.FailOn = value
 		case "--output":
 			f.Output = value
+		case "--fail-on":
+			f.FailOn = value
+		case "--db":
+			f.DB = value
 		default:
 			return f, fmt.Errorf("detect: unknown flag %q", key)
 		}
@@ -181,6 +183,8 @@ Flags:
   --cpe <cpe>          CPE 2.3 identifier
   --purl <purl>        Package URL (e.g. pkg:pypi/django@4.2.0)
   --with-kev           Enrich findings with CISA KEV data
+  --db <path>          Read KEV from SQLite database (default: embedded)
+  --fail-on <level>    Exit non-zero if any finding matches: any, affected, kev
   --output <fmt>       Output format: human (default), json, jsonl, or sarif
   -h, --help           Show this help
 
@@ -188,5 +192,5 @@ Examples:
   cevrixa detect --product "Apache HTTP Server" --version "2.4.49"
   cevrixa detect --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
   cevrixa detect --purl "pkg:pypi/django@4.2.0"
-  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --output sarif`)
+  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --with-kev --db ~/.cevrixa/cevrixa.db`)
 }

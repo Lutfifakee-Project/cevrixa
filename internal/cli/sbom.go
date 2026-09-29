@@ -9,7 +9,6 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/engine"
 	"github.com/Lutfifakee-Project/cevrixa/internal/output"
 	"github.com/Lutfifakee-Project/cevrixa/internal/sbom"
-	"github.com/Lutfifakee-Project/cevrixa/internal/source/kev"
 )
 
 type sbomFlags struct {
@@ -17,6 +16,7 @@ type sbomFlags struct {
 	Output  string
 	WithKEV bool
 	FailOn  string
+	DB      string
 }
 
 func runSBOM(args []string) error {
@@ -35,11 +35,12 @@ func runSBOM(args []string) error {
 
 	opts := engine.Options{}
 	if flags.WithKEV {
-		cat, err := kev.LoadEmbedded()
+		entries, src, err := loadKEV(true, flags.DB)
 		if err != nil {
-			return fmt.Errorf("sbom: load KEV catalog: %w", err)
+			return fmt.Errorf("sbom: %w", err)
 		}
-		opts.KEV = cat.Entries
+		opts.KEV = entries
+		opts.Source = src
 	}
 
 	reports := make([]domain.Report, 0, len(targets))
@@ -117,6 +118,8 @@ func parseSBOMArgs(args []string) (sbomFlags, error) {
 			f.Output = value
 		case "--fail-on":
 			f.FailOn = value
+		case "--db":
+			f.DB = value
 		default:
 			return f, fmt.Errorf("sbom: unknown flag %q", key)
 		}
@@ -141,6 +144,7 @@ Arguments:
 
 Flags:
   --with-kev           Enrich findings with CISA KEV data
+  --db <path>          Read KEV from SQLite database (default: embedded)
   --fail-on <level>    Exit non-zero if any finding matches: any, affected, kev
   --output <fmt>       Output format: human (default), json, jsonl, or sarif
   -h, --help           Show this help
@@ -148,5 +152,5 @@ Flags:
 Examples:
   cevrixa sbom app.cdx.json
   cevrixa sbom - < app.cdx.json --output sarif
-  cevrixa sbom app.cdx.json --fail-on affected`)
+  cevrixa sbom app.cdx.json --fail-on affected --with-kev`)
 }
