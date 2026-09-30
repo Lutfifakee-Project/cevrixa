@@ -339,18 +339,16 @@ Current limitations:
 
 ## Documentation
 
-Documentation currently lives in this README, [CHANGELOG.md](CHANGELOG.md), and
-[CONTRIBUTING.md](CONTRIBUTING.md). Detailed documentation is planned in a
-`docs/` directory:
-
-- Detection architecture
-- Version semantics
-- Vulnerability database format
-- CPE resolution
-- PURL resolution
-- Finding model
-- CLI reference
-- Development guide
+- [Positioning](docs/positioning.md) — what Cevrixa is, what it is not, and the
+  differentiators with their honest status
+- [Architecture](docs/architecture.md) — module boundaries, source interfaces,
+  data flow, repository layout, CI
+- [Detection](docs/detection.md) — detection states, applicability, version
+  evaluation, the finding model, evidence, conflicts, confidence
+- [Roadmap](docs/roadmap.md) — direction, released milestones, next, and known
+  gaps
+- [CHANGELOG.md](CHANGELOG.md) — what changed in each release
+- [CONTRIBUTING.md](CONTRIBUTING.md) — commit and changelog conventions
 
 ## Contributing
 
