@@ -20,6 +20,14 @@ Categories:
 
 Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Security
+
+- Fixed `scan` and `sbom` accepting an unrecognised `--fail-on` gate, which
+  disabled the check and exited successfully on a vulnerable target. Every
+  command that accepts the flag now validates it against the same set of gates.
+
 ## [v0.2.2] — 2026-09-30
 
 ### Detection
