@@ -1,304 +1,362 @@
 # Cevrixa
 
-**Evidence-first vulnerability applicability engine.**
+> Vulnerability intelligence and detection engine for software packages, CPEs, PURLs, and vulnerability data.
 
-Cevrixa determines whether a specific software or package version is
-affected by known vulnerabilities, explains why, and returns
-machine-readable evidence.
+[![Status](https://img.shields.io/badge/status-development-orange.svg)](CHANGELOG.md)
+[![CI](https://github.com/Lutfifakee-Project/cevrixa/actions/workflows/ci.yml/badge.svg)](https://github.com/Lutfifakee-Project/cevrixa/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-## What Cevrixa is not
+## Overview
 
-- Not a network scanner
-- Not an exploit framework or payload generator
-- Not a CVE lookup wrapper
+Cevrixa is a vulnerability intelligence and detection engine. Given a software
+product, package, or system component, it determines whether that specific
+version is affected by known vulnerabilities, and returns the evidence behind
+the decision.
 
-Cevrixa focuses on **applicability**: given a target, is it affected, and
-why?
+The problem it addresses: a list of CVEs for a product name is easy to produce
+and hard to act on. Cevrixa answers the narrower question — is *this version*
+affected, on what evidence, and what is the fixed version?
 
-## Status
+It combines product identification, CPE and PURL resolution, version comparison,
+vulnerability data from multiple sources, and applicability evaluation into a
+single detection result. Every decision is computed from version boundaries
+rather than inferred from a product name.
 
-**v0.2.2** — detection reliability. See [CHANGELOG.md](CHANGELOG.md) for what
-changed and why.
+Detection results are explicit. A question Cevrixa cannot answer is reported as
+`inconclusive`, never as `not_affected`.
 
-## Install
+Cevrixa is not a network scanner, not an exploit framework, and not a CVE lookup
+wrapper.
 
-    git clone https://github.com/Lutfifakee-Project/cevrixa
-    cd cevrixa
-    make build
+## Features
 
-The resulting `bin/cevrixa` binary is self-contained and portable.
+Detection:
 
-Requires Go 1.27+.
+- Product resolution from a product name to a CPE identifier
+- CPE-based vulnerability matching, including `AND` / `OR` configuration nodes,
+  negated nodes, and `vulnerable: false` requirements
+- PURL and package identity across PyPI, npm, Go, Maven, Debian, Alpine, and RPM
+- Version parsing and comparison: numeric core, pre-release identifiers,
+  post-release letter suffixes, and epoch or revision prefixes
+- Affected-version evaluation for CPE criteria and package ranges
+  (`introduced`, `fixed`, `last_affected`)
+- Fixed-version detection
+- Detection status: `affected`, `not_affected`, `inconclusive`
+- Detection confidence: `exact`, `strong`, `moderate`, `weak`
+- Explainable findings with the identity, range, evidence, and reasoning steps
+  behind a decision
+- Cross-source conflict reporting for severity, CVSS, KEV, and status
+- Dataset coverage on every report: records searched, sources, and whether
+  embedded fixtures contributed
 
-## Quick start
+Data:
 
-    # Sync the KEV catalog (live from CISA, no API key required)
-    ./bin/cevrixa sync kev --live
+- NVD (API 2.0), OSV, and CISA KEV data
+- Local SQLite database with incremental `sync`
+- Detection runs against the local dataset, with no network access needed
 
-    # Detect a CPE-based target
-    ./bin/cevrixa detect --product "Apache HTTP Server" --version "2.4.49"
+Interfaces:
 
-    # Detect a package via PURL
-    ./bin/cevrixa detect --purl "pkg:pypi/django@4.2.0"
+- Human, JSON, JSONL, and SARIF output
+- Multi-target scan from a file or stdin
+- CycloneDX SBOM input
+- CI gates through `--fail-on`
 
-    # Explain why a specific CVE applies
-    ./bin/cevrixa explain CVE-2021-41773 --product "Apache HTTP Server" --version "2.4.49"
+## Detection Results
 
-## Commands
+Cevrixa does not reduce every detection to an affected / not-affected answer.
 
-| Command | Purpose |
+| Status | Meaning |
 |---|---|
-| `detect` | Detect whether a single target is affected |
-| `scan` | Read multiple targets from a file or stdin |
-| `sbom` | Read a CycloneDX SBOM and detect affected components |
-| `sync` | Download and persist vulnerability data to local store |
-| `explain` | Explain why a vulnerability does or does not apply |
-| `info` | Show environment and data status |
-| `doctor` | Run environment and data health checks |
-| `version` | Print version information |
-| `help` | Show help |
+| `affected` | The available evidence indicates that the target matches an affected condition. |
+| `not_affected` | The available evidence indicates that the target does not match the affected condition. |
+| `inconclusive` | The available information is insufficient or cannot be evaluated reliably. |
 
-## Input types
+`inconclusive` covers, for example: a configuration that requires a component
+other than the target, a negated configuration, a version that cannot be
+compared, and a package whose version does not match any evaluable range. An
+inconclusive finding carries the reason and the question that would resolve it.
 
-Cevrixa accepts three identity formats:
+This distinction keeps an unresolved identity, an unsupported version syntax, or
+an incomplete applicability statement from being read as a clean result.
 
-**CPE** (product + version):
+The finding model also defines `unknown`, which is currently reserved and not
+produced by the detection paths.
 
-    ./bin/cevrixa detect --product "Apache HTTP Server" --version "2.4.49"
-    ./bin/cevrixa detect --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
+## Architecture
 
-**PURL** (package ecosystem):
+```text
+Input
+  │
+  ├── Product + version
+  ├── CPE
+  ├── PURL
+  └── CycloneDX SBOM / stdin
+        │
+        ▼
+Product Resolver
+        │
+        ▼
+CPE / Package Identity
+        │
+        ▼
+Local Vulnerability Database            NVD · OSV · KEV
+        │
+        ▼
+Applicability Matching
+        │
+        ├── CPE configuration nodes      AND · OR · negate
+        └── Package ranges               introduced · fixed · last_affected
+        │
+        ▼
+Version Evaluation
+        │
+        ▼
+Finding
+        │
+        ├── Affected
+        ├── Not Affected
+        └── Inconclusive
+              │
+              ▼
+Output                                  human · JSON · JSONL · SARIF
+```
 
-    ./bin/cevrixa detect --purl "pkg:pypi/django@4.2.0"
-    ./bin/cevrixa detect --purl "pkg:npm/lodash@4.17.20"
-    ./bin/cevrixa detect --purl "pkg:golang/github.com/gin-gonic/gin@v1.9.0"
-    ./bin/cevrixa detect --purl "pkg:maven/org.apache.commons/commons-lang3@3.12.0"
+## Installation
 
-**SBOM** (CycloneDX JSON):
+Requires Go 1.27 or newer.
 
-    ./bin/cevrixa sbom app.cdx.json
-    ./bin/cevrixa sbom - < app.cdx.json --output sarif
+```bash
+git clone https://github.com/Lutfifakee-Project/cevrixa
+cd cevrixa
+make build
+```
 
-## Output formats
+The binary is written to `bin/cevrixa`.
 
-Human (default):
+Fetch vulnerability data into the local database before detecting:
 
-    ./bin/cevrixa detect ...
+```bash
+./bin/cevrixa sync kev --live
+./bin/cevrixa sync nvd --days 30
+```
 
-JSON:
+## Usage
 
-    ./bin/cevrixa detect ... --output json
+Detect a single target:
 
-JSONL (one finding per line, pipe-friendly):
+```bash
+cevrixa detect --product "Apache HTTP Server" --version 2.4.49
+cevrixa detect --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
+cevrixa detect --purl "pkg:pypi/django@4.2.0" --output json
+```
 
-    ./bin/cevrixa detect ... --output jsonl
+Explain a specific vulnerability against a target:
 
-SARIF 2.1.0 (for CI/CD, GitHub Code Scanning, VS Code):
+```bash
+cevrixa explain CVE-2021-41773 --product "Apache HTTP Server" --version 2.4.49
+cevrixa explain CVE-2021-41773 --cpe "cpe:2.3:a:apache:http_server:2.4.51:*:*:*:*:*:*:*"
+```
 
-    ./bin/cevrixa detect ... --output sarif
+Detect for multiple targets from a file or stdin:
 
-## Example output
+```bash
+cevrixa scan targets.json
+cat targets.jsonl | cevrixa scan -
+```
 
-    Cevrixa
+Detect for every component of a CycloneDX SBOM:
 
-    Target
-      Product     Apache HTTP Server
-      Version     2.4.49
-      Resolved    cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*
+```bash
+cevrixa sbom app.cdx.json --output sarif
+cat app.cdx.json | cevrixa sbom -
+```
 
-    Findings: 2
-    Dataset     local store 1204882 record(s) [nvd, osv]
+Synchronise vulnerability data:
 
-    CVE-2021-41773
-      Status     : AFFECTED
-      Confidence : STRONG
-      Matched    : >=2.4.0 <2.4.51
-      Fixed      : 2.4.51
-      Why        : 2.4.49 in >=2.4.0 <2.4.51
-      KEV        : YES (added 2021-11-03)
-      Evidence   : 3
+```bash
+cevrixa sync kev --live
+cevrixa sync nvd --days 30
+cevrixa sync osv --purl pkg:pypi/django
+cevrixa sync all --days 7
+```
 
-    CVE-2021-42013
-      Status     : AFFECTED
-      Confidence : STRONG
-      Matched    : >=2.4.0 <2.4.51
-      Fixed      : 2.4.51
-      Why        : 2.4.49 in >=2.4.0 <2.4.51
-      Evidence   : 3
+Environment and data status:
 
-## Local store
+```bash
+cevrixa info
+cevrixa doctor
+cevrixa version
+```
 
-Cevrixa can persist vulnerability data to a local SQLite database for
-fast, offline, reproducible detection.
+Common flags:
 
-    # Sync KEV from CISA (~1700 entries)
-    ./bin/cevrixa sync kev --live
+| Flag | Applies to | Meaning |
+|---|---|---|
+| `--db <path>` | detect, scan, sbom, explain, sync, info | Local database (default `~/.cevrixa/cevrixa.db`) |
+| `--output <fmt>` | detect, scan, sbom | `human` (default), `json`, `jsonl`, `sarif` |
+| `--output <fmt>` | explain | `human` (default), `json` |
+| `--fail-on <gate>` | detect, scan, sbom | `none`, `any`, `affected`, `inconclusive`, `kev`, `low`, `medium`, `high`, `critical` |
+| `--with-kev` | detect, scan, sbom | Enrich findings with CISA KEV data |
+| `--verbose` | detect, explain | Show the full reasoning steps |
+| `--quiet` | detect, explain | Print only the identifier and status |
 
-    # Sync recent NVD CVE records (30 days)
-    ./bin/cevrixa sync nvd --days 30
+Input formats for `scan` and stdin are a JSON array or JSONL, one target per
+entry, using `product` and `version`, `cpe`, or `purl`:
 
-    # Sync OSV vulnerabilities for a package
-    ./bin/cevrixa sync osv --purl pkg:pypi/django
+```json
+[{"product": "Apache HTTP Server", "version": "2.4.49"}]
+{"purl": "pkg:pypi/django@4.2.0"}
+{"cpe": "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"}
+```
 
-    # Sync all applicable sources
-    ./bin/cevrixa sync all --days 7
+`sbom` reads CycloneDX JSON. Components must carry a PURL; components without
+one are skipped, because Cevrixa cannot resolve their identity.
 
-By default, the local DB lives at `~/.cevrixa/cevrixa.db`. Override with
-`--db <path>`.
+## Example Output
 
-Once a DB exists, `detect`, `scan`, `sbom`, and `explain` use it
-automatically without needing an explicit `--db` flag.
+```text
+$ cevrixa detect --product "Apache HTTP Server" --version 2.4.49
 
-### NVD rate limits
+[+] Target
+    Product      Apache HTTP Server
+    Version      2.4.49
+    Resolved     cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*
 
-The NVD public API enforces 5 requests per 30 seconds. Cevrixa handles
-this automatically by spacing requests ~6 seconds apart — no API key
-required. If you set an NVD API key in `~/.cevrixa/config.json` (see
-below), Cevrixa uses the faster 50-req/30s limit.
+[*] Findings: 2
+    [*] Dataset      local store 7310 record(s) + embedded fixtures 9 record(s), TEST DATA [nvd, osv]
 
-### Full history
+    [+] CVE-2021-41773
+        [*] Status       AFFECTED
+        [*] Severity     HIGH
+        [*] CVSS         7.5 (v3.1)
+        [*] Confidence   STRONG
+        [*] Matched      >=2.4.0 <2.4.51
+        [*] Fixed        2.4.51
+        [*] Evidence     6
 
-To fetch the entire NVD history (~250k CVE), use:
+    [+] CVE-2021-42013
+        [*] Status       AFFECTED
+        [*] Severity     CRITICAL
+        [*] CVSS         9.8 (v3.1)
+        [*] Confidence   STRONG
+        [*] Matched      >=2.4.0 <2.4.51
+        [*] Fixed        2.4.51
+        [*] Evidence     6
+```
 
-    ./bin/cevrixa sync nvd --full
+A question that cannot be answered is reported as such, with the reason:
 
-This is slow (hours without an API key). Prefer `--days N` for regular
-updates.
+```text
+$ cevrixa explain CVE-2008-4128 --cpe "cpe:2.3:o:cisco:ios:12.4:*:*:*:*:*:*:*"
 
-## Configuration
+[+] CVE-2008-4128
 
-Optional. Cevrixa reads `~/.cevrixa/config.json`:
+    [+] Decision
+        [*] Status       INCONCLUSIVE
+        [!] No verdict was produced: AND configuration requires an additional component that is not the target
 
-    {
-      "log_level": "info",
-      "default_output": "human",
-      "nvd_api_key": ""
-    }
+    [+] Identity
+        [*] CPE          cpe:2.3:o:cisco:ios:12.4:*:*:*:*:*:*:*
 
-A missing config file is not an error.
+    [+] Why
+        • AND configuration requires an additional component that is not the target
+```
 
-## CI/CD
+Machine-readable output is available for automation:
 
-Cevrixa exits non-zero when findings match a given threshold:
+```bash
+cevrixa detect --product "Apache HTTP Server" --version 2.4.49 --output json
+cevrixa detect --product "Apache HTTP Server" --version 2.4.49 --output jsonl
+cevrixa detect --product "Apache HTTP Server" --version 2.4.49 --output sarif
+```
 
-    ./bin/cevrixa detect ... --fail-on affected
-    ./bin/cevrixa detect ... --fail-on kev
-    ./bin/cevrixa detect ... --fail-on critical
-    ./bin/cevrixa detect ... --fail-on inconclusive
-    ./bin/cevrixa scan targets.json --fail-on any
+## Data Sources
 
-Accepted gates: `none`, `any`, `affected`, `inconclusive`, `kev`, and the
-severity labels `low`, `medium` (`moderate`), `high`, `critical`. An
-unrecognised gate is rejected instead of silently disabling the check.
+Cevrixa works with vulnerability information from multiple sources:
 
-SARIF output can be uploaded directly to GitHub Code Scanning:
+- **NVD** — CVE records and CPE applicability statements, through API 2.0
+- **OSV** — package vulnerability ranges
+- **CISA KEV** — known exploited vulnerabilities, used as enrichment
 
-    ./bin/cevrixa detect ... --output sarif > cevrixa.sarif
+Coverage depends on which datasets have been synchronised. Every report states
+how many records were searched and which sources contributed, so a result can be
+read in the context of the data behind it.
 
-## Data sources
+NVD requests are rate limited and spaces them automatically; an API key in
+`~/.cevrixa/config.json` raises the limit. Configuration is optional:
 
-Cevrixa consumes public vulnerability intelligence from multiple upstream
-sources. Source adapters are independent of the detection engine and
-preserve provenance for every piece of evidence.
+```json
+{
+  "log_level": "info",
+  "default_output": "human",
+  "nvd_api_key": ""
+}
+```
 
-- **NVD** — CVE and CPE applicability (`services.nvd.nist.gov`)
-- **OSV** — package vulnerability databases (`api.osv.dev`)
-- **CISA KEV** — Known Exploited Vulnerabilities catalog
+When no local database is present, Cevrixa falls back to a small set of embedded
+fixtures so the detection pipeline can be exercised without syncing first. Those
+records are test data, and every report that includes them labels them as such.
 
-Cevrixa does not claim data ownership. Every finding carries evidence
-provenance back to its source.
+## Project Status
 
-## Design principles
+Cevrixa is under active development. The latest tagged release is `v0.2.2`; see
+[CHANGELOG.md](CHANGELOG.md) for what changed.
 
-1. **Evidence-first** — every claim carries provenance
-2. **Version-centric** — applicability is computed, not guessed
-3. **Explainable** — decisions come with reasoning steps
-4. **Conflict-aware** — sources disagreements are surfaced, never hidden, and
-   wording differences between sources are normalised so that a difference in
-   vocabulary is never reported as a difference in meaning
-5. **Local-first** — detection works offline once synced
-6. **Reproducible** — results state which dataset they came from: the number of
-   records searched, the sources, and whether embedded test fixtures contributed
-7. **Composable** — JSON / JSONL / SARIF outputs, stdin inputs
-8. **Minimal** — small dependency surface, standard library when possible
-9. **Never guesses** — when a configuration cannot be decided from a single
-   target (`AND` groups that need another component, negated nodes, unusable
-   versions), Cevrixa reports `inconclusive` with the reason instead of
-   reporting `affected`
+Core detection is being built incrementally: product resolution, CPE resolution,
+affected-version matching, fixed-version detection, finding generation, detection
+explanations, and data-source integration.
 
-## Development
+Current limitations:
 
-    make build    # build binary into bin/
-    make test     # run all tests
-    make vet      # run go vet
-    make check    # fmt + vet + test
-    make fmt      # gofmt -s -w .
-
-Commit message and changelog conventions live in [CONTRIBUTING.md](CONTRIBUTING.md).
+- Detection reads the entire local dataset for each target; there is no candidate
+  filter by vendor and product yet.
+- Version semantics are generic. Ecosystem-specific semantics are not applied per
+  ecosystem yet, so some version syntaxes compare approximately.
+- `explain` does not evaluate package targets: `--purl` reports `inconclusive`.
+- `sbom` supports CycloneDX only.
+- Embedded fixtures are used when no local database is present. They are test
+  data, not vulnerability intelligence.
 
 ## Roadmap
 
-Implemented in v0.2.2:
+- [x] Initial project architecture
+- [x] Version intelligence
+- [x] CPE support
+- [x] PURL support
+- [x] Initial vulnerability database integration
+- [x] Basic detection engine
+- [x] Inconclusive detection state
+- [x] Explainable detection results
+- [ ] Product resolver improvements
+- [ ] CPE resolution improvements
+- [ ] Ecosystem-specific version semantics
+- [ ] Improved candidate filtering
+- [ ] Expanded SBOM support, starting with SPDX
+- [ ] Additional vulnerability data sources
+- [ ] Detection performance improvements
+- [ ] Reproducible detection tied to a database snapshot
 
-- NVD API 2.0 configuration nodes are read from `nodes` rather than `children`,
-  so synced records carry CPE criteria and CPE detection works against real data
-  instead of silently finding nothing (see the operational note in
-  [CHANGELOG.md](CHANGELOG.md) if you already have a database)
+## Documentation
 
-Implemented in v0.2.1:
+Documentation currently lives in this README, [CHANGELOG.md](CHANGELOG.md), and
+[CONTRIBUTING.md](CONTRIBUTING.md). Detailed documentation is planned in a
+`docs/` directory:
 
-- Package versions with a letter suffix are parsed instead of rejected
-  (`openssl 1.1.1c`), and Debian revisions and RPM releases sort after the plain
-  version instead of below it
-- A package whose version cannot be compared is reported as `inconclusive` with
-  the reason, instead of being dropped from the results
+- Detection architecture
+- Version semantics
+- Vulnerability database format
+- CPE resolution
+- PURL resolution
+- Finding model
+- CLI reference
+- Development guide
 
-Implemented in v0.2.0 (detection reliability):
+## Contributing
 
-- CPE configuration semantics: `AND` and `OR` are evaluated as NVD defines
-  them, `negate` is reported instead of silently ignored, and
-  `vulnerable: false` entries are treated as requirements rather than dropped
-- A version pinned inside a criteria string is honoured (previously every
-  version of the product matched such a criterion)
-- Version ranges are evaluated with the correct boundary inclusivity, and a
-  criterion that pins an exact version now yields `exact` confidence instead of
-  `wildcard`
-- Undecidable applicability is reported as `inconclusive` with a reason, never
-  as `affected`
-- `explain` no longer prints `NOT AFFECTED` for a question it did not evaluate
-  (package targets, unresolved identities, unusable versions)
-- Cross-source conflicts are reachable from `detect`, and conflict values are
-  normalised so wording differences are not reported as disagreement
-- Dataset coverage is part of every report, and embedded test fixtures are
-  labelled as test data
-- `--fail-on` accepts severity gates and rejects unknown values instead of
-  silently disabling the gate
-
-Implemented in v0.1.0:
-
-- Version intelligence (CPE + PURL, SemVer, Debian, RPM)
-- NVD, OSV, CISA KEV adapters
-- Detection engine with confidence scoring
-- Local SQLite store with `sync` (kev, nvd, osv, all)
-- `detect`, `scan`, `sbom`, `explain`, `info`, `doctor`
-- Human / JSON / JSONL / SARIF output
-- `--fail-on` for CI gates
-
-Deferred:
-
-- Distinct zero-result outcomes (`NOT_AFFECTED` vs `NO_DATA` vs
-  `IDENTITY_UNRESOLVED`); dataset coverage is reported, but the outcome values
-  themselves are not emitted yet
-- Candidate prefilter by CPE vendor/product — every stored record is currently
-  scanned for each target
-- Candidate matching that reports *why* a candidate was considered and rejected
-- Package applicability inside `explain` (`--purl` reports `inconclusive`)
-- Vendor advisory adapters (vendor-specific)
-- `why` / `why-not` as separate commands
-- SPDX SBOM support (currently CycloneDX only)
-- Snapshot rollback / named snapshots
-- Rules engine and plugin sources
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the commit message format, the
+changelog categories, and the checks a change must keep green.
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
