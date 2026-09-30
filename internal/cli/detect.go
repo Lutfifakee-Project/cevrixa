@@ -193,6 +193,14 @@ func validateDetectFlags(f detectFlags) error {
 	default:
 		return fmt.Errorf("detect: unsupported --output %q (supported: human, json, jsonl, sarif)", f.Output)
 	}
+	if f.FailOn != "" && !domain.ValidGate(f.FailOn) {
+		// A typo here used to disable the CI gate silently, exiting 0 on a
+		// vulnerable target. Validate instead of ignoring.
+		return fmt.Errorf(
+			"detect: unsupported --fail-on %q (supported: none, any, affected, inconclusive, kev, low, medium, high, critical)",
+			f.FailOn,
+		)
+	}
 	return nil
 }
 
@@ -208,7 +216,7 @@ Flags:
   --purl <purl>        Package URL (e.g. pkg:pypi/django@4.2.0)
   --with-kev           Enrich findings with CISA KEV data
   --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
-  --fail-on <level>    Exit non-zero if any finding matches: any, affected, kev
+  --fail-on <level>    Exit non-zero if any finding matches: none, any, affected, inconclusive, kev, or a severity (low, medium, high, critical)
   --verbose            Show full reasoning steps
   --quiet              Print only CVE-ID + status per finding
   --output <fmt>       Output format: human (default), json, jsonl, or sarif

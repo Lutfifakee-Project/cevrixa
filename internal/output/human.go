@@ -26,6 +26,7 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 	renderTarget(w, r.Target)
 	fmt.Fprintln(w)
 	fmt.Fprintf(w, "[*] Findings: %d\n", len(r.Findings))
+	renderDataset(w, r.Dataset)
 
 	if len(r.Findings) == 0 {
 		fmt.Fprintln(w)
@@ -41,6 +42,24 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 
 	printAttributionFooter(w, r.Findings)
 	return nil
+}
+
+// renderDataset states which records a report was computed from, so that a
+// zero-finding result can be told apart from a run against no data, and so that
+// embedded test fixtures are never mistaken for vulnerability intelligence.
+func renderDataset(w io.Writer, d domain.DatasetInfo) {
+	if d.Empty() && len(d.Sources) == 0 {
+		fmt.Fprintln(w, "    [*] Dataset      none (no local store and no embedded fixtures)")
+		return
+	}
+	desc := fmt.Sprintf("local store %d record(s)", d.StoreRecords)
+	if d.FixtureRecords > 0 {
+		desc += fmt.Sprintf(" + embedded fixtures %d record(s), TEST DATA", d.FixtureRecords)
+	}
+	if len(d.Sources) > 0 {
+		desc += " [" + strings.Join(d.Sources, ", ") + "]"
+	}
+	fmt.Fprintf(w, "    [*] Dataset      %s\n", desc)
 }
 
 func renderTarget(w io.Writer, t domain.Target) {
@@ -106,6 +125,25 @@ func renderFinding(w io.Writer, f domain.Finding, opts RenderOptions) {
 		fmt.Fprintln(w, "        [-] Why")
 		for _, s := range f.Why.Steps {
 			fmt.Fprintf(w, "            • %s\n", s)
+		}
+	}
+	if f.Status == domain.FindingStatusInconclusive {
+		if f.Why.VersionMatch != "" {
+			fmt.Fprintf(w, "        [!] Undecided    %s\n", f.Why.VersionMatch)
+		}
+		for _, step := range f.Why.Steps {
+			fmt.Fprintf(w, "            • %s\n", step)
+		}
+		for _, q := range f.Why.Questions {
+			fmt.Fprintf(w, "            ? %s\n", q)
+		}
+	}
+	if len(f.Conflicts) > 0 {
+		fmt.Fprintf(w, "        [!] Conflicts    sources disagree (%d kind(s))\n", len(f.Conflicts))
+		for _, c := range f.Conflicts {
+			for _, v := range c.Values {
+				fmt.Fprintf(w, "            %s %s = %s\n", strings.ToUpper(string(c.Kind)), v.Source, v.Value)
+			}
 		}
 	}
 	fmt.Fprintf(w, "        [*] Evidence     %d\n", len(f.Evidence))

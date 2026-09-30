@@ -17,6 +17,47 @@ type ExplainReport struct {
 	Applicable    bool
 	Fixed         string
 	Confidence    string
+
+	// NotEvaluated reports that applicability was never evaluated for this
+	// target (for example a package target, an unresolved identity, or an
+	// unusable version). The zero value means "was evaluated", so a report that
+	// simply carries a verdict cannot silently become inconclusive.
+	NotEvaluated bool
+	// NotEvaluatedReason explains why no verdict could be produced.
+	NotEvaluatedReason string
+}
+
+type ExplainDecision string
+
+const (
+	ExplainDecisionAffected     ExplainDecision = "affected"
+	ExplainDecisionNotAffected  ExplainDecision = "not_affected"
+	ExplainDecisionInconclusive ExplainDecision = "inconclusive"
+)
+
+// Decision derives the verdict. Inconclusive is returned whenever Cevrixa did
+// not actually evaluate applicability, so that explain can never print
+// NOT AFFECTED for a question it did not answer.
+func (r ExplainReport) Decision() ExplainDecision {
+	if r.NotEvaluated {
+		return ExplainDecisionInconclusive
+	}
+	if r.Applicable {
+		return ExplainDecisionAffected
+	}
+	return ExplainDecisionNotAffected
+}
+
+// DecisionLabel renders a decision for human output.
+func (d ExplainDecision) Label() string {
+	switch d {
+	case ExplainDecisionAffected:
+		return "AFFECTED"
+	case ExplainDecisionNotAffected:
+		return "NOT AFFECTED"
+	default:
+		return "INCONCLUSIVE"
+	}
 }
 
 func RenderExplainHuman(w io.Writer, r ExplainReport) error {
@@ -25,24 +66,21 @@ func RenderExplainHuman(w io.Writer, r ExplainReport) error {
 
 func RenderExplainHumanWithOptions(w io.Writer, r ExplainReport, opts RenderOptions) error {
 	if opts.Quiet {
-		decision := "NOT_AFFECTED"
-		if r.Applicable {
-			decision = "AFFECTED"
-		}
-		_, err := fmt.Fprintf(w, "%s %s\n", r.Vulnerability.ID, decision)
+		_, err := fmt.Fprintf(w, "%s %s\n",
+			r.Vulnerability.ID,
+			strings.ToUpper(string(r.Decision())),
+		)
 		return err
 	}
 
 	fmt.Fprintf(w, "[+] %s\n", r.Vulnerability.ID)
 	fmt.Fprintln(w)
 
-	decision := "NOT AFFECTED"
-	if r.Applicable {
-		decision = "AFFECTED"
-	}
 	fmt.Fprintln(w, "    [+] Decision")
-	fmt.Fprintf(w, "        [*] Status       %s\n", decision)
-	if r.Confidence != "" {
+	fmt.Fprintf(w, "        [*] Status       %s\n", r.Decision().Label())
+	if r.NotEvaluated {
+		fmt.Fprintf(w, "        [!] No verdict was produced: %s\n", r.NotEvaluatedReason)
+	} else if r.Confidence != "" {
 		fmt.Fprintf(w, "        [*] Confidence   %s\n", strings.ToUpper(r.Confidence))
 	}
 	fmt.Fprintln(w)
@@ -70,10 +108,16 @@ func RenderExplainHumanWithOptions(w io.Writer, r ExplainReport, opts RenderOpti
 		}
 		fmt.Fprintf(w, "        [*] Criteria     %s\n", r.Match.Criteria)
 		result := "NO MATCH"
-		if r.Applicable {
+		switch {
+		case r.Match.Undecided:
+			result = "UNDECIDED"
+		case r.Applicable:
 			result = "MATCH"
 		}
 		fmt.Fprintf(w, "        [*] Result       %s\n", result)
+		if r.Match.Undecided && r.Match.Reason != "" {
+			fmt.Fprintf(w, "        [!] Reason       %s\n", r.Match.Reason)
+		}
 		fmt.Fprintln(w)
 	}
 
@@ -109,21 +153,21 @@ func RenderExplainJSON(w io.Writer, r ExplainReport) error {
 		Source          string             `json:"source"`
 		Summary         string             `json:"summary,omitempty"`
 		Decision        string             `json:"decision"`
+		Undecided       bool               `json:"undecided,omitempty"`
+		Reason          string             `json:"reason,omitempty"`
 		Confidence      string             `json:"confidence"`
 		Target          domain.Target      `json:"target"`
 		Applicability   map[string]any     `json:"applicability,omitempty"`
 		Fixed           string             `json:"fixed,omitempty"`
 		References      []domain.Reference `json:"references,omitempty"`
 	}
-	decision := "not_affected"
-	if r.Applicable {
-		decision = "affected"
-	}
 	out := jsonOut{
 		VulnerabilityID: r.Vulnerability.ID,
 		Source:          r.Vulnerability.Source,
 		Summary:         r.Vulnerability.Summary,
-		Decision:        decision,
+		Decision:        string(r.Decision()),
+		Undecided:       r.Match.Undecided || r.NotEvaluated,
+		Reason:          r.reason(),
 		Confidence:      r.Confidence,
 		Target:          r.Target,
 		Fixed:           r.Fixed,
@@ -139,4 +183,15 @@ func RenderExplainJSON(w io.Writer, r ExplainReport) error {
 	}
 	enc := newJSONEncoder(w)
 	return enc.Encode(out)
+}
+
+// reason returns the single explanation for a report that could not be decided.
+func (r ExplainReport) reason() string {
+	if r.NotEvaluated {
+		return r.NotEvaluatedReason
+	}
+	if r.Match.Undecided {
+		return r.Match.Reason
+	}
+	return ""
 }

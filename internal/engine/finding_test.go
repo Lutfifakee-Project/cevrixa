@@ -29,7 +29,7 @@ func TestBuildFindingBasic(t *testing.T) {
 		Mode:     "range",
 	}
 
-	f := buildFinding(targetCPE, vuln, mr)
+	f := buildFinding(targetCPE, vuln, mr, nil)
 
 	if f.VulnerabilityID != "CVE-2021-41773" {
 		t.Fatalf("VulnerabilityID = %q", f.VulnerabilityID)
@@ -62,9 +62,66 @@ func TestBuildFindingNoFixed(t *testing.T) {
 	vuln := domain.Vulnerability{ID: "CVE-X", Source: "nvd"}
 	mr := matcher.Result{Matched: true, Range: ">=2.4.0"}
 
-	f := buildFinding(targetCPE, vuln, mr)
+	f := buildFinding(targetCPE, vuln, mr, nil)
 
 	if len(f.FixedVersions) != 0 {
 		t.Fatalf("FixedVersions should be empty, got %v", f.FixedVersions)
+	}
+}
+
+func TestStatusForResult(t *testing.T) {
+	cases := []struct {
+		name string
+		mr   matcher.Result
+		want domain.FindingStatus
+	}{
+		{"matched", matcher.Result{Matched: true}, domain.FindingStatusAffected},
+		{"decided non-match", matcher.Result{Matched: false}, domain.FindingStatusNotAffected},
+		{"undecided is never affected", matcher.Result{Undecided: true}, domain.FindingStatusInconclusive},
+		{"undecided wins over matched", matcher.Result{Matched: true, Undecided: true}, domain.FindingStatusInconclusive},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := statusForResult(tc.mr); got != tc.want {
+				t.Fatalf("statusForResult = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAttachCorrelationSurfacesCrossSourceConflict(t *testing.T) {
+	vuln := domain.Vulnerability{
+		ID:     "CVE-2021-41773",
+		Source: "nvd",
+		Risk:   &domain.Risk{Severity: "MODERATE"},
+	}
+	enrichments := []domain.Enrichment{
+		{Source: "other-db", VulnerabilityID: "CVE-2021-41773", Risk: &domain.Risk{Severity: "CRITICAL"}},
+	}
+
+	f := attachCorrelation(domain.Finding{VulnerabilityID: vuln.ID}, vuln, enrichments)
+
+	if len(f.Conflicts) != 1 {
+		t.Fatalf("expected 1 cross-source conflict, got %+v", f.Conflicts)
+	}
+	if len(f.Evidence) == 0 {
+		t.Fatal("expected correlated evidence")
+	}
+}
+
+func TestAttachCorrelationVocabularyDifferenceIsNotConflict(t *testing.T) {
+	vuln := domain.Vulnerability{
+		ID:     "CVE-2021-41773",
+		Source: "nvd",
+		Risk:   &domain.Risk{Severity: "MODERATE"},
+	}
+	enrichments := []domain.Enrichment{
+		{Source: "other-db", VulnerabilityID: "CVE-2021-41773", Risk: &domain.Risk{Severity: "medium"}},
+	}
+
+	f := attachCorrelation(domain.Finding{VulnerabilityID: vuln.ID}, vuln, enrichments)
+
+	if len(f.Conflicts) != 0 {
+		t.Fatalf("MODERATE vs medium is wording, not a conflict: %+v", f.Conflicts)
 	}
 }

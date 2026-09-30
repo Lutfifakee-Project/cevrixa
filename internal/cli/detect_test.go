@@ -93,6 +93,34 @@ func TestValidateDetectFlagsAcceptsJSONL(t *testing.T) {
 	}
 }
 
+func TestValidateDetectFlagsFailOn(t *testing.T) {
+	ok := []string{"none", "any", "affected", "inconclusive", "kev", "low", "medium", "high", "critical", "CRITICAL"}
+	for _, gate := range ok {
+		t.Run("accepts "+gate, func(t *testing.T) {
+			err := validateDetectFlags(detectFlags{
+				CPE:    "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*",
+				FailOn: gate,
+			})
+			if err != nil {
+				t.Fatalf("--fail-on %q should be accepted, got: %v", gate, err)
+			}
+		})
+	}
+
+	bad := []string{"bogus", "critcal", "sev:high"}
+	for _, gate := range bad {
+		t.Run("rejects "+gate, func(t *testing.T) {
+			err := validateDetectFlags(detectFlags{
+				CPE:    "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*",
+				FailOn: gate,
+			})
+			if err == nil {
+				t.Fatalf("--fail-on %q must be rejected instead of silently disabling the gate", gate)
+			}
+		})
+	}
+}
+
 func TestParseDetectArgsFailOn(t *testing.T) {
 	got, err := parseDetectArgs([]string{
 		"--product", "Apache", "--version", "2.4.49", "--fail-on", "affected",

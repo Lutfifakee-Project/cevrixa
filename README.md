@@ -17,7 +17,8 @@ why?
 
 ## Status
 
-**v0.1.0** — first milestone. Full detection pipeline with local store.
+**v0.2.0** — detection reliability. See [CHANGELOG.md](CHANGELOG.md) for what
+changed and why.
 
 ## Install
 
@@ -101,11 +102,12 @@ SARIF 2.1.0 (for CI/CD, GitHub Code Scanning, VS Code):
     Cevrixa
 
     Target
-      Product : Apache HTTP Server
-      Version : 2.4.49
-      Resolved: cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*
+      Product     Apache HTTP Server
+      Version     2.4.49
+      Resolved    cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*
 
     Findings: 2
+    Dataset     local store 1204882 record(s) [nvd, osv]
 
     CVE-2021-41773
       Status     : AFFECTED
@@ -181,7 +183,13 @@ Cevrixa exits non-zero when findings match a given threshold:
 
     ./bin/cevrixa detect ... --fail-on affected
     ./bin/cevrixa detect ... --fail-on kev
+    ./bin/cevrixa detect ... --fail-on critical
+    ./bin/cevrixa detect ... --fail-on inconclusive
     ./bin/cevrixa scan targets.json --fail-on any
+
+Accepted gates: `none`, `any`, `affected`, `inconclusive`, `kev`, and the
+severity labels `low`, `medium` (`moderate`), `high`, `critical`. An
+unrecognised gate is rejected instead of silently disabling the check.
 
 SARIF output can be uploaded directly to GitHub Code Scanning:
 
@@ -205,11 +213,18 @@ provenance back to its source.
 1. **Evidence-first** — every claim carries provenance
 2. **Version-centric** — applicability is computed, not guessed
 3. **Explainable** — decisions come with reasoning steps
-4. **Conflict-aware** — sources disagreements are surfaced, never hidden
+4. **Conflict-aware** — sources disagreements are surfaced, never hidden, and
+   wording differences between sources are normalised so that a difference in
+   vocabulary is never reported as a difference in meaning
 5. **Local-first** — detection works offline once synced
-6. **Reproducible** — results can be tied to a database snapshot
+6. **Reproducible** — results state which dataset they came from: the number of
+   records searched, the sources, and whether embedded test fixtures contributed
 7. **Composable** — JSON / JSONL / SARIF outputs, stdin inputs
 8. **Minimal** — small dependency surface, standard library when possible
+9. **Never guesses** — when a configuration cannot be decided from a single
+   target (`AND` groups that need another component, negated nodes, unusable
+   versions), Cevrixa reports `inconclusive` with the reason instead of
+   reporting `affected`
 
 ## Development
 
@@ -220,6 +235,27 @@ provenance back to its source.
     make fmt      # gofmt -s -w .
 
 ## Roadmap
+
+Implemented in v0.2.0 (detection reliability):
+
+- CPE configuration semantics: `AND` and `OR` are evaluated as NVD defines
+  them, `negate` is reported instead of silently ignored, and
+  `vulnerable: false` entries are treated as requirements rather than dropped
+- A version pinned inside a criteria string is honoured (previously every
+  version of the product matched such a criterion)
+- Version ranges are evaluated with the correct boundary inclusivity, and a
+  criterion that pins an exact version now yields `exact` confidence instead of
+  `wildcard`
+- Undecidable applicability is reported as `inconclusive` with a reason, never
+  as `affected`
+- `explain` no longer prints `NOT AFFECTED` for a question it did not evaluate
+  (package targets, unresolved identities, unusable versions)
+- Cross-source conflicts are reachable from `detect`, and conflict values are
+  normalised so wording differences are not reported as disagreement
+- Dataset coverage is part of every report, and embedded test fixtures are
+  labelled as test data
+- `--fail-on` accepts severity gates and rejects unknown values instead of
+  silently disabling the gate
 
 Implemented in v0.1.0:
 
@@ -233,6 +269,13 @@ Implemented in v0.1.0:
 
 Deferred:
 
+- Distinct zero-result outcomes (`NOT_AFFECTED` vs `NO_DATA` vs
+  `IDENTITY_UNRESOLVED`); dataset coverage is reported, but the outcome values
+  themselves are not emitted yet
+- Candidate prefilter by CPE vendor/product — every stored record is currently
+  scanned for each target
+- Candidate matching that reports *why* a candidate was considered and rejected
+- Package applicability inside `explain` (`--purl` reports `inconclusive`)
 - Vendor advisory adapters (vendor-specific)
 - `why` / `why-not` as separate commands
 - SPDX SBOM support (currently CycloneDX only)

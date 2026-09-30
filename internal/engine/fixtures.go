@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
@@ -27,19 +28,21 @@ func loadFixturesFromEmbed() ([]domain.Vulnerability, error) {
 	return append(cveVulns, osvVulns...), nil
 }
 
-func loadVulnerabilities(opts Options) ([]domain.Vulnerability, error) {
+func loadVulnerabilities(opts Options) ([]domain.Vulnerability, domain.DatasetInfo, error) {
 	fixtures, err := loadFixturesFromEmbed()
 	if err != nil {
-		return nil, err
+		return nil, domain.DatasetInfo{}, err
 	}
 
 	if opts.Store == nil {
-		return fixtures, nil
+		return fixtures, describeDataset(0, len(fixtures), fixtures), nil
 	}
 
 	stored, err := opts.Store.ListVulnerabilities()
 	if err != nil {
-		return fixtures, nil
+		// Never fall back silently here: an unreadable local dataset must be
+		// reported as an error, not quietly replaced by embedded test fixtures.
+		return nil, domain.DatasetInfo{}, fmt.Errorf("engine: read local dataset: %w", err)
 	}
 
 	seen := make(map[string]bool)
@@ -61,7 +64,27 @@ func loadVulnerabilities(opts Options) ([]domain.Vulnerability, error) {
 		seen[key] = true
 		merged = append(merged, v)
 	}
-	return merged, nil
+	return merged, describeDataset(len(stored), len(fixtures), merged), nil
+}
+
+// describeDataset records which records a report was computed from, so that a
+// zero-finding result can be read as "searched N records and found nothing"
+// rather than being indistinguishable from "there was no data".
+func describeDataset(storeRecords, fixtureRecords int, vulns []domain.Vulnerability) domain.DatasetInfo {
+	info := domain.DatasetInfo{
+		StoreRecords:   storeRecords,
+		FixtureRecords: fixtureRecords,
+	}
+	seen := make(map[string]bool)
+	for _, v := range vulns {
+		if v.Source == "" || seen[v.Source] {
+			continue
+		}
+		seen[v.Source] = true
+		info.Sources = append(info.Sources, v.Source)
+	}
+	sort.Strings(info.Sources)
+	return info
 }
 
 func loadFixturesFS(fsys fs.FS, dir string) ([]domain.Vulnerability, error) {

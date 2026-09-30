@@ -60,7 +60,10 @@ func runExplain(args []string) error {
 
 	vuln, err := engine.FindByID(flags.VulnID, opts)
 	if err != nil {
-		return fmt.Errorf("explain: %w", err)
+		return fmt.Errorf(
+			"explain: %w\n  hint: the local dataset does not contain this identifier; run 'cevrixa sync nvd --days 30' or pass --db <path>",
+			err,
+		)
 	}
 
 	report := output.ExplainReport{
@@ -68,18 +71,40 @@ func runExplain(args []string) error {
 		Target:        target,
 	}
 
-	if target.ResolvedCPE != "" {
+	switch {
+	case flags.PURL != "":
+		// Package applicability is evaluated by the package matcher, which
+		// explain does not run yet. Saying so is the honest answer: reporting
+		// NOT AFFECTED here would be a wrong answer, not a missing feature.
+		report.NotEvaluated = true
+		report.NotEvaluatedReason = "package (PURL) applicability is not evaluated by explain yet; run 'cevrixa detect --purl " + flags.PURL + "'"
+	case target.ResolvedCPE == "":
+		report.NotEvaluated = true
+		report.NotEvaluatedReason = "target identity could not be resolved to a CPE; pass --cpe or use a product present in the resolver catalog"
+	default:
 		targetCPE, err := domain.ParseCPE(target.ResolvedCPE)
 		if err != nil {
 			return fmt.Errorf("explain: %w", err)
 		}
 		report.TargetCPE = targetCPE
 
-		mr, _ := matcher.MatchCPE(targetCPE, vuln)
+		// A matcher error means the question could not be answered. Swallowing
+		// it here used to turn an unusable version into "NOT AFFECTED".
+		mr, matchErr := matcher.MatchCPE(targetCPE, vuln)
 		report.Match = mr
+		if matchErr != nil {
+			report.NotEvaluated = true
+			report.NotEvaluatedReason = matchErr.Error()
+			break
+		}
 		report.Applicable = mr.Matched
 		report.Fixed = mr.Fixed
 		report.Confidence = string(engine.ConfidenceFromMode(mr.Mode))
+
+		if mr.Undecided {
+			report.NotEvaluated = true
+			report.NotEvaluatedReason = mr.Reason
+		}
 	}
 
 	switch flags.Output {
@@ -192,7 +217,7 @@ Flags:
   --product <name>     Product name (requires --version)
   --version <ver>      Product version
   --cpe <cpe>          CPE 2.3 identifier
-  --purl <purl>        Package URL
+  --purl <purl>        Package URL (package applicability is not evaluated yet)
   --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
   --verbose            Show full reasoning steps
   --quiet              Print only ID + decision

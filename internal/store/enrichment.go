@@ -90,6 +90,35 @@ func (s *Store) GetEnrichmentAny(vulnID string, preferredSource string) (domain.
 	return e, nil
 }
 
+// ListEnrichments returns every stored enrichment for a vulnerability, from
+// all sources. Correlation needs all of them to be able to detect that two
+// sources disagree.
+func (s *Store) ListEnrichments(vulnID string) ([]domain.Enrichment, error) {
+	rows, err := s.db.Query(`
+		SELECT payload FROM enrichments
+		WHERE vulnerability_id = ?
+		ORDER BY source
+	`, vulnID)
+	if err != nil {
+		return nil, fmt.Errorf("store: list enrichments: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Enrichment
+	for rows.Next() {
+		var payload []byte
+		if err := rows.Scan(&payload); err != nil {
+			return nil, fmt.Errorf("store: scan enrichment: %w", err)
+		}
+		var e domain.Enrichment
+		if err := json.Unmarshal(payload, &e); err != nil {
+			return nil, fmt.Errorf("store: unmarshal enrichment: %w", err)
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) CountEnrichments() (int, error) {
 	var n int
 	if err := s.db.QueryRow(`SELECT COUNT(*) FROM enrichments`).Scan(&n); err != nil {

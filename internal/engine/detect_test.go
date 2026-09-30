@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
+	"github.com/Lutfifakee-Project/cevrixa/internal/matcher"
 	"github.com/Lutfifakee-Project/cevrixa/internal/store"
 )
 
@@ -216,6 +217,92 @@ func TestDetectFallbackToEmbeddedWhenStoreEmpty(t *testing.T) {
 	}
 	if len(report.Findings) < 2 {
 		t.Fatalf("expected embedded fallback findings, got %d", len(report.Findings))
+	}
+}
+
+func TestDetectAndRequirementDoesNotProduceFinding(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "and.db")
+	s, err := store.Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer s.Close()
+
+	// NVD shape: tomcat is affected only when an Oracle component is present.
+	// Reporting a finding for tomcat alone is the classic CPE false positive.
+	if err := s.SaveVulnerability(domain.Vulnerability{
+		ID:     "CVE-AND-001",
+		Source: "nvd",
+		Applicability: []domain.ApplicabilityNode{
+			{
+				Operator: "OR",
+				Children: []domain.ApplicabilityNode{
+					{
+						Operator: "AND",
+						Matches: []domain.CPEMatch{
+							{Vulnerable: true, Criteria: "cpe:2.3:a:apache:tomcat:*:*:*:*:*:*:*:*"},
+							{Vulnerable: false, Criteria: "cpe:2.3:a:oracle:instantis_enterprisetrack:17.1:*:*:*:*:*:*:*"},
+						},
+					},
+				},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SaveVulnerability: %v", err)
+	}
+
+	report, err := Detect(domain.Target{CPE: "cpe:2.3:a:apache:tomcat:8.5.87:*:*:*:*:*:*:*"}, Options{Store: s})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	for _, f := range report.Findings {
+		if f.VulnerabilityID == "CVE-AND-001" {
+			t.Fatalf("AND requirement must not be reported as affected: %+v", f)
+		}
+	}
+}
+
+func TestDetectReportsDatasetCoverage(t *testing.T) {
+	report, err := Detect(domain.Target{Product: "Apache HTTP Server", Version: "2.4.49"}, Options{})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	if report.Dataset.FixtureRecords == 0 {
+		t.Fatal("embedded fixtures must be reported in dataset coverage")
+	}
+	if len(report.Dataset.Sources) == 0 {
+		t.Fatal("dataset sources must be reported")
+	}
+	if report.Dataset.Empty() {
+		t.Fatal("dataset with records must not report Empty")
+	}
+}
+
+func TestDetectReportsEmptyDatasetForUnresolvedIdentity(t *testing.T) {
+	report, err := Detect(domain.Target{Product: "Nonexistent Software", Version: "1.0"}, Options{})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	if len(report.Findings) != 0 {
+		t.Fatalf("expected 0 findings, got %d", len(report.Findings))
+	}
+	if report.Dataset.Empty() {
+		t.Fatal("dataset coverage must still be reported when the identity is unresolved")
+	}
+}
+
+func TestStatusForResultUndecidedNeverAffected(t *testing.T) {
+	targetCPE, err := domain.ParseCPE("cpe:2.3:a:apache:tomcat:8.5.87:*:*:*:*:*:*:*")
+	if err != nil {
+		t.Fatalf("ParseCPE: %v", err)
+	}
+	f := buildFinding(targetCPE, domain.Vulnerability{ID: "CVE-AND-001", Source: "nvd"}, matcher.Result{
+		Undecided: true,
+		Reason:    "AND configuration requires an additional component",
+	}, nil)
+
+	if f.Status != domain.FindingStatusInconclusive {
+		t.Fatalf("Status = %q, want inconclusive", f.Status)
 	}
 }
 

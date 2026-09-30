@@ -16,7 +16,7 @@ func FindByID(vulnID string, opts Options) (domain.Vulnerability, error) {
 	}
 	want := strings.ToUpper(vulnID)
 
-	vulns, err := loadVulnerabilities(opts)
+	vulns, _, err := loadVulnerabilities(opts)
 	if err != nil {
 		return domain.Vulnerability{}, err
 	}

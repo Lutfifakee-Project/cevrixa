@@ -5,10 +5,10 @@ import "strings"
 type FindingStatus string
 
 const (
-	FindingStatusAffected    FindingStatus = "affected"
-	FindingStatusNotAffected FindingStatus = "not_affected"
-	FindingStatusUnknown     FindingStatus = "unknown"
-	FindingStatusConflict    FindingStatus = "conflict"
+	FindingStatusAffected     FindingStatus = "affected"
+	FindingStatusNotAffected  FindingStatus = "not_affected"
+	FindingStatusInconclusive FindingStatus = "inconclusive"
+	FindingStatusUnknown      FindingStatus = "unknown"
 )
 
 type FindingConfidence string
@@ -33,6 +33,9 @@ type Why struct {
 	VersionMatch  string   `json:"version_match,omitempty"`
 	FixedReason   string   `json:"fixed_reason,omitempty"`
 	Steps         []string `json:"steps,omitempty"`
+	// Questions lists what Cevrixa would need in order to answer, when the
+	// verdict is inconclusive.
+	Questions []string `json:"questions,omitempty"`
 }
 
 type Finding struct {
@@ -50,21 +53,81 @@ type Finding struct {
 }
 
 type Report struct {
-	Target   Target    `json:"target"`
-	Findings []Finding `json:"findings"`
+	Target   Target      `json:"target"`
+	Findings []Finding   `json:"findings"`
+	Dataset  DatasetInfo `json:"dataset"`
 }
 
+// severityRank orders canonical severity labels from least to most severe.
+// Gates such as --fail-on high are evaluated against this order.
+var severityRank = map[string]int{
+	"none":     0,
+	"low":      1,
+	"medium":   2,
+	"high":     3,
+	"critical": 4,
+}
+
+// CanonicalSeverity normalises severity vocabulary differences between
+// sources. NVD publishes MODERATE while other databases use medium; a
+// difference in wording must never be reported as a difference in meaning.
+func CanonicalSeverity(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "unknown", "unspecified", "not_defined":
+		return ""
+	case "moderate":
+		return "medium"
+	case "info", "informational", "negligible":
+		return "none"
+	default:
+		return strings.ToLower(strings.TrimSpace(value))
+	}
+}
+
+// ValidGate reports whether gate is a threshold Cevrixa understands. Callers
+// that accept user input must validate it, so that a typo in --fail-on fails
+// loudly instead of silently disabling the gate.
+func ValidGate(gate string) bool {
+	switch strings.ToLower(strings.TrimSpace(gate)) {
+	case "", "none", "any", "affected", "inconclusive", "kev":
+		return true
+	}
+	_, ok := severityRank[CanonicalSeverity(gate)]
+	return ok
+}
+
+// IsSeverityAtLeast reports whether the finding satisfies the given gate.
+// Recognised gates: none, any, affected, inconclusive, kev, and the severity
+// labels low, medium (moderate), high, critical. An unrecognised gate returns
+// false; validate user input with ValidGate first.
 func (f Finding) IsSeverityAtLeast(threshold string) bool {
-	switch strings.ToLower(threshold) {
+	switch g := strings.ToLower(strings.TrimSpace(threshold)); g {
 	case "", "none":
 		return false
 	case "any":
 		return true
 	case "affected":
-		return f.Status == FindingStatusAffected || f.Status == FindingStatusConflict
+		return f.Status == FindingStatusAffected
+	case "inconclusive":
+		return f.Status == FindingStatusInconclusive
 	case "kev":
 		return f.KnownExploited != nil
 	default:
-		return false
+		want, ok := severityRank[CanonicalSeverity(g)]
+		if !ok {
+			return false
+		}
+		have, ok := severityRank[CanonicalSeverity(f.severity())]
+		if !ok {
+			return false
+		}
+		return have >= want
 	}
+}
+
+func (f Finding) severity() string {
+	if f.Risk == nil {
+		return ""
+	}
+	return f.Risk.Severity
 }

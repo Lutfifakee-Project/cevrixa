@@ -36,6 +36,13 @@ func vulnEvidence(v domain.Vulnerability) []domain.Evidence {
 		})
 	}
 
+	// The vulnerability's own risk data is evidence too. Without it a
+	// disagreement between this record and another source's enrichment could
+	// never be observed, because only one side would have a value.
+	if v.Risk != nil {
+		ev = append(ev, riskEvidence(v.Source, *v.Risk)...)
+	}
+
 	for i := range v.References {
 		ref := v.References[i]
 		ev = append(ev, domain.Evidence{

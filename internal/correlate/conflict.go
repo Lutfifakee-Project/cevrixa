@@ -1,12 +1,32 @@
 package correlate
 
-import "github.com/Lutfifakee-Project/cevrixa/internal/domain"
+import (
+	"strings"
+
+	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
+)
 
 var scalarConflictKinds = map[domain.EvidenceKind]bool{
 	domain.EvidenceKindSeverity: true,
 	domain.EvidenceKindStatus:   true,
 	domain.EvidenceKindCVSS:     true,
 	domain.EvidenceKindKEV:      true,
+}
+
+// normalizeConflictValue reduces cosmetic wording differences so that two
+// sources saying the same thing in different words are not reported as a
+// disagreement. NVD publishes MODERATE where other databases publish medium;
+// that is a vocabulary difference, not a conflict.
+func normalizeConflictValue(kind domain.EvidenceKind, value string) string {
+	switch kind {
+	case domain.EvidenceKindSeverity:
+		if canonical := domain.CanonicalSeverity(value); canonical != "" {
+			return canonical
+		}
+		return strings.ToLower(strings.TrimSpace(value))
+	default:
+		return strings.ToLower(strings.TrimSpace(value))
+	}
 }
 
 func detectConflicts(evidence []domain.Evidence) []domain.Conflict {
@@ -26,7 +46,8 @@ func detectConflicts(evidence []domain.Evidence) []domain.Conflict {
 		if !scalarConflictKinds[e.Kind] {
 			continue
 		}
-		if e.Value == "" {
+		value := normalizeConflictValue(e.Kind, e.Value)
+		if value == "" {
 			continue
 		}
 
@@ -41,14 +62,14 @@ func detectConflicts(evidence []domain.Evidence) []domain.Conflict {
 			buckets[k] = b
 			order = append(order, k)
 		}
-		dedupKey := e.Source + "\x00" + e.Value
+		dedupKey := e.Source + "\x00" + value
 		if b.seen[dedupKey] {
 			continue
 		}
 		b.seen[dedupKey] = true
 		b.values = append(b.values, domain.ConflictValue{
 			Source: e.Source,
-			Value:  e.Value,
+			Value:  value,
 		})
 	}
 
