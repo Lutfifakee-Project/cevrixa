@@ -442,7 +442,7 @@ func ParseLenient(input string) (Version, error) {
 	}
 
 	// Real world versions break SemVer's no-leading-zero rule for numeric
-	// pre-release identifiers (sonicwall firmware 12.4.3-02854). Retry with
+	// pre-release identifiers (firmware builds such as 12.4.3-02854). Retry with
 	// those zeros removed so the version can still be compared instead of being
 	// reported as uncomparable.
 	if relaxed := stripPrereleaseLeadingZeros(s); relaxed != s {

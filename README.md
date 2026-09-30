@@ -234,6 +234,8 @@ provenance back to its source.
     make check    # fmt + vet + test
     make fmt      # gofmt -s -w .
 
+Commit message and changelog conventions live in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Roadmap
 
 Implemented in v0.2.2:

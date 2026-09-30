@@ -307,9 +307,9 @@ func TestStatusForResultUndecidedNeverAffected(t *testing.T) {
 }
 
 func TestDetectDebianLetterSuffixVersionIsAffected(t *testing.T) {
-	// Regression from manual verification: this exact target returned zero
-	// findings with exit code 0, because openssl 1.1.1c could not be parsed and
-	// the package was skipped without a word.
+	// Regression: this target returned zero findings with exit code 0, because
+	// openssl 1.1.1c could not be parsed and the package was skipped without a
+	// word.
 	report, err := Detect(domain.Target{PURL: "pkg:deb/debian/openssl@1.1.1c-1ubuntu1"}, Options{})
 	if err != nil {
 		t.Fatalf("Detect: %v", err)

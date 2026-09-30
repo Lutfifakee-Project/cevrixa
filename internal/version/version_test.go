@@ -301,8 +301,8 @@ func TestParsePinnedVersionSuffixStillCompares(t *testing.T) {
 }
 
 func TestParseLenientToleratesLeadingZeroPrerelease(t *testing.T) {
-	// sonicwall firmware 12.4.3-02854 was rejected outright, which made the
-	// whole version range uncomparable.
+	// A firmware version such as 12.4.3-02854 was rejected outright, which made
+	// the whole version range uncomparable.
 	v, err := ParseLenient("12.4.3-02854")
 	if err != nil {
 		t.Fatalf("ParseLenient: %v", err)
