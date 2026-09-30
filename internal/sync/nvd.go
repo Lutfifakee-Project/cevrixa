@@ -25,10 +25,10 @@ type NVDOptions struct {
 
 func (o *NVDOptions) applyDefaults() {
 	if o.PageLimit <= 0 {
-		o.PageLimit = 2000
+		o.PageLimit = 500
 	}
 	if o.MaxPages <= 0 {
-		o.MaxPages = 50
+		o.MaxPages = 200
 	}
 }
 
@@ -66,7 +66,7 @@ func SyncNVD(ctx context.Context, opts NVDOptions) (int, error) {
 			LastModEnd:   end,
 		})
 		if err != nil {
-			return total, fmt.Errorf("sync nvd: page %d: %w", pages, err)
+			return total, fmt.Errorf("page %d: %w", pages, err)
 		}
 
 		for _, v := range res.Vulnerabilities {

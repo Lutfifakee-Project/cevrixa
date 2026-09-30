@@ -157,7 +157,7 @@ func syncNVDRemote(dbPath string, days int) error {
 	}
 	defer s.Close()
 
-	client := nvd.NewClient(&http.Client{Timeout: 180 * time.Second})
+	client := nvd.NewClient(&http.Client{Timeout: 600 * time.Second})
 	cfg, _ := config.Load()
 	if cfg.NVDAPIKey != "" {
 		client.APIKey = cfg.NVDAPIKey
@@ -174,7 +174,8 @@ func syncNVDRemote(dbPath string, days int) error {
 		Store:        s,
 		LastModStart: start,
 		LastModEnd:   end,
-		ProgressFreq: 500,
+		PageLimit:    500,
+		ProgressFreq: 100,
 	})
 	if err != nil {
 		return fmt.Errorf("sync nvd: %w", err)
@@ -193,7 +194,7 @@ func syncNVDFull(dbPath string) error {
 	}
 	defer s.Close()
 
-	client := nvd.NewClient(&http.Client{Timeout: 180 * time.Second})
+	client := nvd.NewClient(&http.Client{Timeout: 600 * time.Second})
 	cfg, _ := config.Load()
 	if cfg.NVDAPIKey != "" {
 		client.APIKey = cfg.NVDAPIKey
