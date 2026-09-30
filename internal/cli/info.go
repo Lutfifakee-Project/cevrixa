@@ -58,10 +58,8 @@ func runInfo(args []string) error {
 		defer s.Close()
 		n, _ := s.CountVulnerabilities()
 		k, _ := s.CountKEV()
-		en, _ := s.CountEnrichments()
 		fmt.Printf("  vulnerabilities: %d\n", n)
 		fmt.Printf("  kev entries: %d\n", k)
-		fmt.Printf("  enrichments: %d\n", en)
 		if meta, err := s.GetSyncMetadata("nvd"); err == nil {
 			fmt.Printf("  last nvd sync: %s (%d records)\n", meta.LastSyncISO, meta.RecordsSynced)
 		}
@@ -73,7 +71,6 @@ func runInfo(args []string) error {
 	fmt.Println("Sources")
 	fmt.Println("  nvd: configured")
 	fmt.Println("  osv: configured")
-	fmt.Println("  dbcve: configured")
 	fmt.Println("  kev: configured")
 
 	return nil

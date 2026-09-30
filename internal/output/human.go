@@ -123,9 +123,5 @@ func enrichmentAttribution(e *domain.Enrichment) string {
 		}
 		return s
 	}
-	switch e.Source {
-	case "dbcve":
-		return "dbcve.org (CC-BY-4.0)"
-	}
 	return ""
 }

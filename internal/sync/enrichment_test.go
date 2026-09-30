@@ -160,3 +160,22 @@ func TestSyncEnrichmentNoIDs(t *testing.T) {
 		t.Fatal("expected error for empty IDs")
 	}
 }
+func TestSaveEnrichmentsBulk(t *testing.T) {
+	s := openEnrichStore(t)
+	items := []domain.Enrichment{
+		{Source: "dbcve", VulnerabilityID: "CVE-1", Mitigation: "x"},
+		{Source: "dbcve", VulnerabilityID: "", Mitigation: "skip"},
+		{Source: "dbcve", VulnerabilityID: "CVE-2", Mitigation: "y"},
+	}
+	n, err := SaveEnrichmentsBulk(items, s)
+	if err != nil {
+		t.Fatalf("SaveEnrichmentsBulk: %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("written = %d, want 2", n)
+	}
+	count, _ := s.CountEnrichments()
+	if count != 2 {
+		t.Fatalf("count = %d", count)
+	}
+}

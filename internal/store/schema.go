@@ -1,5 +1,10 @@
 package store
 
+// migrations maps a schema version to the DDL statements that bring the
+// database from version (key-1) to (key). Migrations are applied in order.
+//
+// Never edit an existing migration. To change the schema, add a new
+// version with new statements.
 var migrations = map[int][]string{
 	1: {
 		`CREATE TABLE IF NOT EXISTS vulnerabilities (
@@ -39,5 +44,8 @@ var migrations = map[int][]string{
 			PRIMARY KEY (vulnerability_id, source)
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_enrichments_vuln ON enrichments(vulnerability_id)`,
+	},
+	4: {
+		`DELETE FROM enrichments WHERE source = 'dbcve'`,
 	},
 }

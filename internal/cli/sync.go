@@ -12,7 +12,6 @@ import (
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/config"
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
-	"github.com/Lutfifakee-Project/cevrixa/internal/source/dbcve"
 	"github.com/Lutfifakee-Project/cevrixa/internal/source/kev"
 	"github.com/Lutfifakee-Project/cevrixa/internal/source/nvd"
 	"github.com/Lutfifakee-Project/cevrixa/internal/source/osv"
@@ -30,19 +29,12 @@ type syncFlags struct {
 	PackageName string
 	Ecosystem   string
 	Version     string
-	CVEIDs      []string
-	FromStore   bool
-	Limit       int
-	Interval    time.Duration
 }
-
-const defaultDBCVELimitInAll = 100
-const defaultDBCVEInterval = 1 * time.Second
 
 func runSync(args []string) error {
 	if len(args) == 0 {
 		printSyncUsage()
-		return errors.New("sync: target required (kev, nvd, osv, dbcve, or all)")
+		return errors.New("sync: target required (kev, nvd, osv, or all)")
 	}
 
 	target := ""
@@ -63,9 +55,6 @@ func runSync(args []string) error {
 	if flags.Days == 0 {
 		flags.Days = 7
 	}
-	if flags.Interval == 0 {
-		flags.Interval = defaultDBCVEInterval
-	}
 	if flags.DBPath == "" {
 		p, err := defaultDBPath()
 		if err != nil {
@@ -84,44 +73,31 @@ func runSync(args []string) error {
 		return syncNVDRemote(flags.DBPath, flags.Days)
 	case "osv":
 		return syncOSVRemote(flags)
-	case "dbcve":
-		return syncDBCVERemote(flags)
 	case "all":
 		return syncAll(flags)
 	default:
-		return fmt.Errorf("sync: unknown target %q (supported: kev, nvd, osv, dbcve, all)", flags.Target)
+		return fmt.Errorf("sync: unknown target %q (supported: kev, nvd, osv, all)", flags.Target)
 	}
 }
 
 func syncAll(flags syncFlags) error {
-	fmt.Fprintln(os.Stderr, "sync all: [1/4] kev")
+	fmt.Fprintln(os.Stderr, "sync all: [1/3] kev")
 	if err := syncKEV(flags.DBPath, flags.Live); err != nil {
 		return err
 	}
 
-	fmt.Fprintln(os.Stderr, "sync all: [2/4] nvd")
+	fmt.Fprintln(os.Stderr, "sync all: [2/3] nvd")
 	if err := syncNVDRemote(flags.DBPath, flags.Days); err != nil {
 		return err
 	}
 
 	if flags.PURL != "" || flags.PackageName != "" {
-		fmt.Fprintln(os.Stderr, "sync all: [3/4] osv")
+		fmt.Fprintln(os.Stderr, "sync all: [3/3] osv")
 		if err := syncOSVRemote(flags); err != nil {
 			return err
 		}
 	} else {
-		fmt.Fprintln(os.Stderr, "sync all: [3/4] osv skipped (no --purl or --package)")
-	}
-
-	// Enrichment: DBCVE from-store with limit unless user overrode.
-	enrichFlags := flags
-	if enrichFlags.Limit == 0 {
-		enrichFlags.Limit = defaultDBCVELimitInAll
-	}
-	enrichFlags.FromStore = true
-	fmt.Fprintf(os.Stderr, "sync all: [4/4] dbcve enrichment (limit=%d)\n", enrichFlags.Limit)
-	if err := syncDBCVERemote(enrichFlags); err != nil {
-		fmt.Fprintf(os.Stderr, "sync all: dbcve enrichment failed (continuing): %v\n", err)
+		fmt.Fprintln(os.Stderr, "sync all: [3/3] osv skipped (no --purl or --package)")
 	}
 
 	fmt.Fprintln(os.Stderr, "sync all: done")
@@ -263,42 +239,6 @@ func syncOSVRemote(flags syncFlags) error {
 	return nil
 }
 
-func syncDBCVERemote(flags syncFlags) error {
-	if err := os.MkdirAll(filepath.Dir(flags.DBPath), 0o755); err != nil {
-		return fmt.Errorf("sync dbcve: mkdir: %w", err)
-	}
-	s, err := store.Open(flags.DBPath)
-	if err != nil {
-		return fmt.Errorf("sync dbcve: open store: %w", err)
-	}
-	defer s.Close()
-
-	if len(flags.CVEIDs) == 0 && !flags.FromStore {
-		return fmt.Errorf("sync dbcve: provide --cve <id> (repeatable) or --from-store")
-	}
-
-	client := dbcve.NewClient(&http.Client{Timeout: 60 * time.Second})
-
-	written, failed, err := syncpkg.SyncEnrichment(context.Background(), syncpkg.EnrichmentSyncOptions{
-		Enricher:     client,
-		Store:        s,
-		VulnIDs:      flags.CVEIDs,
-		FromStore:    flags.FromStore,
-		Limit:        flags.Limit,
-		Interval:     flags.Interval,
-		ProgressFreq: 25,
-	})
-	if err != nil {
-		return fmt.Errorf("sync dbcve: %w", err)
-	}
-	if failed > 0 {
-		fmt.Fprintf(os.Stderr, "sync dbcve: %d enrichments written (%d failed)\n", written, failed)
-	} else {
-		fmt.Fprintf(os.Stderr, "sync dbcve: %d enrichments written\n", written)
-	}
-	return nil
-}
-
 func parseSyncArgs(args []string) (syncFlags, error) {
 	var f syncFlags
 
@@ -315,10 +255,6 @@ func parseSyncArgs(args []string) (syncFlags, error) {
 		}
 		if arg == "--live" {
 			f.Live = true
-			continue
-		}
-		if arg == "--from-store" {
-			f.FromStore = true
 			continue
 		}
 
@@ -348,20 +284,6 @@ func parseSyncArgs(args []string) (syncFlags, error) {
 			f.Ecosystem = value
 		case "--version":
 			f.Version = value
-		case "--cve":
-			f.CVEIDs = append(f.CVEIDs, value)
-		case "--limit":
-			n, err := strconv.Atoi(value)
-			if err != nil || n < 0 {
-				return f, fmt.Errorf("sync: --limit must be a non-negative integer")
-			}
-			f.Limit = n
-		case "--interval":
-			d, err := time.ParseDuration(value)
-			if err != nil || d < 0 {
-				return f, fmt.Errorf("sync: --interval must be a duration (e.g. 500ms, 1s)")
-			}
-			f.Interval = d
 		default:
 			return f, fmt.Errorf("sync: unknown flag %q", key)
 		}
@@ -386,8 +308,7 @@ Targets:
   kev                  Sync CISA Known Exploited Vulnerabilities
   nvd                  Sync recent CVE records from NVD API 2.0
   osv                  Sync OSV vulnerabilities for a package/PURL
-  dbcve                Sync DBCVE enrichment for CVEs
-  all                  Sync KEV + NVD + (OSV) + DBCVE enrichment
+  all                  Sync all available targets
 
 Flags:
   --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db)
@@ -398,18 +319,12 @@ Flags:
   --package <name>     For OSV: package name
   --ecosystem <name>   For OSV: PyPI, npm, Go, Maven
   --version <ver>      For OSV: restrict to a version
-  --cve <id>           For DBCVE: enrich one CVE (repeatable)
-  --from-store         For DBCVE: enrich every CVE in the local store
-  --limit <n>          For DBCVE: max number of enrichments (0 = unlimited)
-  --interval <dur>     For DBCVE: delay between requests (default 1s)
   -h, --help           Show this help
 
 Examples:
   cevrixa sync kev --live
   cevrixa sync nvd --days 30
   cevrixa sync osv --purl pkg:pypi/django
-  cevrixa sync dbcve --cve CVE-2021-41773
-  cevrixa sync dbcve --from-store --limit 100
   cevrixa sync all --days 7
 
 No NVD API key required. Rate limits are handled automatically.`)

@@ -9,7 +9,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 type Store struct {
 	db   *sql.DB
@@ -25,8 +25,6 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: open %s: %w", path, err)
 	}
-	// SQLite serializes writes; keep a single connection to avoid
-	// "database is locked" errors under concurrent use.
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(0)

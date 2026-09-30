@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/source"
 	"github.com/Lutfifakee-Project/cevrixa/internal/store"
 )
@@ -80,4 +81,20 @@ func SyncEnrichment(ctx context.Context, opts EnrichmentSyncOptions) (written, f
 	}
 
 	return written, failed, nil
+}
+func SaveEnrichmentsBulk(items []domain.Enrichment, s *store.Store) (int, error) {
+	if s == nil {
+		return 0, fmt.Errorf("sync enrichment bulk: store required")
+	}
+	written := 0
+	for _, e := range items {
+		if e.VulnerabilityID == "" {
+			continue
+		}
+		if err := s.SaveEnrichment(e); err != nil {
+			return written, fmt.Errorf("sync enrichment bulk: save %s: %w", e.VulnerabilityID, err)
+		}
+		written++
+	}
+	return written, nil
 }
