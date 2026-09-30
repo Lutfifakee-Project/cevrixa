@@ -23,84 +23,92 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 		return renderHumanQuiet(w, r)
 	}
 
-	fmt.Fprintln(w, "Cevrixa")
+	renderTarget(w, r.Target)
 	fmt.Fprintln(w)
+	fmt.Fprintf(w, "[*] Findings: %d\n", len(r.Findings))
 
-	fmt.Fprintln(w, "Target")
-	if r.Target.Product != "" {
-		fmt.Fprintf(w, "  Product : %s\n", r.Target.Product)
+	if len(r.Findings) == 0 {
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "    [!] No matching vulnerabilities found in the current local dataset.")
+		fmt.Fprintln(w, "        This does NOT prove the target is not affected.")
+		return nil
 	}
-	if r.Target.Version != "" {
-		fmt.Fprintf(w, "  Version : %s\n", r.Target.Version)
-	}
-	if r.Target.CPE != "" {
-		fmt.Fprintf(w, "  CPE     : %s\n", r.Target.CPE)
-	}
-	if r.Target.PURL != "" {
-		fmt.Fprintf(w, "  PURL    : %s\n", r.Target.PURL)
-	}
-	if r.Target.ResolvedCPE != "" && r.Target.ResolvedCPE != r.Target.CPE {
-		fmt.Fprintf(w, "  Resolved: %s\n", r.Target.ResolvedCPE)
-	}
-
-	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Findings: %d\n", len(r.Findings))
 
 	for _, f := range r.Findings {
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "%s\n", f.VulnerabilityID)
-		fmt.Fprintf(w, "  Status     : %s\n", strings.ToUpper(string(f.Status)))
-		if f.Risk != nil {
-			if f.Risk.Severity != "" {
-				fmt.Fprintf(w, "  Severity   : %s\n", f.Risk.Severity)
-			}
-			if f.Risk.CVSS != 0 {
-				v := ""
-				if f.Risk.CVSSVersion != "" {
-					v = " (v" + f.Risk.CVSSVersion + ")"
-				}
-				fmt.Fprintf(w, "  CVSS       : %s%s\n", formatFloat(f.Risk.CVSS), v)
-			}
-		}
-		fmt.Fprintf(w, "  Confidence : %s\n", strings.ToUpper(string(f.Confidence)))
-		if f.Applicability.Range != "" {
-			fmt.Fprintf(w, "  Matched    : %s\n", f.Applicability.Range)
-		}
-		if len(f.FixedVersions) > 0 {
-			fmt.Fprintf(w, "  Fixed      : %s\n", f.FixedVersions[0])
-		}
-		if f.Why.VersionMatch != "" {
-			fmt.Fprintf(w, "  Why        : %s\n", f.Why.VersionMatch)
-		}
-		if f.KnownExploited != nil {
-			line := "  KEV        : YES"
-			if f.KnownExploited.DateAdded != "" {
-				line += " (added " + f.KnownExploited.DateAdded + ")"
-			}
-			fmt.Fprintln(w, line)
-		}
-		if f.Enrichment != nil {
-			if f.Enrichment.Mitigation != "" {
-				fmt.Fprintf(w, "  Mitigation : %s\n", f.Enrichment.Mitigation)
-			}
-			if f.Enrichment.PoCURL != "" {
-				fmt.Fprintf(w, "  PoC        : %s\n", f.Enrichment.PoCURL)
-			}
-			if f.Enrichment.PatchCommitURL != "" {
-				fmt.Fprintf(w, "  Patch      : %s\n", f.Enrichment.PatchCommitURL)
-			}
-		}
-		if opts.Verbose && len(f.Why.Steps) > 0 {
-			fmt.Fprintln(w, "  Steps:")
-			for _, s := range f.Why.Steps {
-				fmt.Fprintf(w, "    - %s\n", s)
-			}
-		}
-		fmt.Fprintf(w, "  Evidence   : %d\n", len(f.Evidence))
+		renderFinding(w, f, opts)
 	}
 
 	printAttributionFooter(w, r.Findings)
 	return nil
+}
+
+func renderTarget(w io.Writer, t domain.Target) {
+	fmt.Fprintln(w, "[+] Target")
+	if t.Product != "" {
+		fmt.Fprintf(w, "    Product      %s\n", t.Product)
+	}
+	if t.Version != "" {
+		fmt.Fprintf(w, "    Version      %s\n", t.Version)
+	}
+	if t.CPE != "" {
+		fmt.Fprintf(w, "    CPE          %s\n", t.CPE)
+	}
+	if t.PURL != "" {
+		fmt.Fprintf(w, "    PURL         %s\n", t.PURL)
+	}
+	if t.ResolvedCPE != "" && t.ResolvedCPE != t.CPE {
+		fmt.Fprintf(w, "    Resolved     %s\n", t.ResolvedCPE)
+	}
+}
+
+func renderFinding(w io.Writer, f domain.Finding, opts RenderOptions) {
+	fmt.Fprintf(w, "    [+] %s\n", f.VulnerabilityID)
+	fmt.Fprintf(w, "        [*] Status       %s\n", strings.ToUpper(string(f.Status)))
+	if f.Risk != nil {
+		if f.Risk.Severity != "" {
+			fmt.Fprintf(w, "        [*] Severity     %s\n", f.Risk.Severity)
+		}
+		if f.Risk.CVSS != 0 {
+			v := ""
+			if f.Risk.CVSSVersion != "" {
+				v = " (v" + f.Risk.CVSSVersion + ")"
+			}
+			fmt.Fprintf(w, "        [*] CVSS         %s%s\n", formatFloat(f.Risk.CVSS), v)
+		}
+	}
+	fmt.Fprintf(w, "        [*] Confidence   %s\n", strings.ToUpper(string(f.Confidence)))
+	if f.Applicability.Range != "" {
+		fmt.Fprintf(w, "        [*] Matched      %s\n", f.Applicability.Range)
+	}
+	if len(f.FixedVersions) > 0 {
+		fmt.Fprintf(w, "        [*] Fixed        %s\n", f.FixedVersions[0])
+	}
+	if f.KnownExploited != nil {
+		line := "        [*] KEV          YES"
+		if f.KnownExploited.DateAdded != "" {
+			line += " (added " + f.KnownExploited.DateAdded + ")"
+		}
+		fmt.Fprintln(w, line)
+	}
+	if f.Enrichment != nil {
+		if f.Enrichment.Mitigation != "" {
+			fmt.Fprintf(w, "        [*] Mitigation   %s\n", f.Enrichment.Mitigation)
+		}
+		if f.Enrichment.PoCURL != "" {
+			fmt.Fprintf(w, "        [*] PoC          %s\n", f.Enrichment.PoCURL)
+		}
+		if f.Enrichment.PatchCommitURL != "" {
+			fmt.Fprintf(w, "        [*] Patch        %s\n", f.Enrichment.PatchCommitURL)
+		}
+	}
+	if opts.Verbose && len(f.Why.Steps) > 0 {
+		fmt.Fprintln(w, "        [-] Why")
+		for _, s := range f.Why.Steps {
+			fmt.Fprintf(w, "            • %s\n", s)
+		}
+	}
+	fmt.Fprintf(w, "        [*] Evidence     %d\n", len(f.Evidence))
 }
 
 func renderHumanQuiet(w io.Writer, r domain.Report) error {
@@ -124,7 +132,7 @@ func printAttributionFooter(w io.Writer, findings []domain.Finding) {
 		return
 	}
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "Enrichment data: %s\n", attr)
+	fmt.Fprintf(w, "[!] Enrichment data: %s\n", attr)
 }
 
 func enrichmentAttribution(e *domain.Enrichment) string {

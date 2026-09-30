@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
+	"github.com/Lutfifakee-Project/cevrixa/internal/matcher"
 )
 
 func sampleReport() domain.Report {
@@ -21,6 +22,11 @@ func sampleReport() domain.Report {
 				VulnerabilityID: "CVE-2021-41773",
 				Status:          domain.FindingStatusAffected,
 				Confidence:      domain.ConfidenceStrong,
+				Risk: &domain.Risk{
+					Severity:    "HIGH",
+					CVSS:        7.5,
+					CVSSVersion: "3.1",
+				},
 				Applicability: domain.Applicability{
 					Matched: true,
 					Range:   ">=2.4.0 <2.4.51",
@@ -35,13 +41,37 @@ func sampleReport() domain.Report {
 	}
 }
 
+func sampleExplainFull() ExplainReport {
+	cpe, _ := domain.ParseCPE("cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*")
+	return ExplainReport{
+		Vulnerability: domain.Vulnerability{
+			ID:      "CVE-2021-41773",
+			Source:  "nvd",
+			Summary: "Path traversal",
+			References: []domain.Reference{
+				{URL: "https://example.test/advisory", Source: "nvd"},
+			},
+		},
+		Target: domain.Target{
+			Product:     "Apache HTTP Server",
+			Version:     "2.4.49",
+			ResolvedCPE: "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*",
+		},
+		TargetCPE:  cpe,
+		Match:      matcher.Result{Matched: true, Criteria: "cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*", Range: ">=2.4.0 <2.4.51", Fixed: "2.4.51", Mode: "range"},
+		Applicable: true,
+		Fixed:      "2.4.51",
+		Confidence: "strong",
+	}
+}
+
 func TestRenderHumanBasic(t *testing.T) {
 	var buf bytes.Buffer
 	if err := RenderHuman(&buf, sampleReport()); err != nil {
 		t.Fatalf("RenderHuman: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"Cevrixa", "Apache HTTP Server", "2.4.49", "CVE-2021-41773", "AFFECTED", "STRONG", "2.4.51"} {
+	for _, want := range []string{"[+] Target", "Apache HTTP Server", "2.4.49", "CVE-2021-41773", "AFFECTED", "STRONG", "2.4.51", "Findings: 1"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("output missing %q\n%s", want, out)
 		}
@@ -53,8 +83,141 @@ func TestRenderHumanEmptyReport(t *testing.T) {
 	if err := RenderHuman(&buf, domain.Report{}); err != nil {
 		t.Fatalf("RenderHuman: %v", err)
 	}
-	if !strings.Contains(buf.String(), "Findings: 0") {
-		t.Fatalf("expected Findings: 0, got: %s", buf.String())
+	out := buf.String()
+	if !strings.Contains(out, "Findings: 0") {
+		t.Fatalf("expected Findings: 0, got: %s", out)
+	}
+	if !strings.Contains(out, "No matching vulnerabilities") {
+		t.Fatalf("expected zero-findings warning, got: %s", out)
+	}
+	if !strings.Contains(out, "does NOT prove") {
+		t.Fatalf("expected honest disclaimer, got: %s", out)
+	}
+}
+
+func TestRenderHumanWithRisk(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, sampleReport()); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Severity", "HIGH", "CVSS", "7.5", "v3.1"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("output missing %q\n%s", want, out)
+		}
+	}
+}
+
+func TestRenderHumanWithKEV(t *testing.T) {
+	report := sampleReport()
+	report.Findings[0].KnownExploited = &domain.KEVInfo{
+		CVEID:     "CVE-2021-41773",
+		DateAdded: "2021-11-03",
+	}
+
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, report); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "KEV") {
+		t.Fatalf("expected KEV line in output:\n%s", out)
+	}
+	if !strings.Contains(out, "2021-11-03") {
+		t.Fatalf("expected date in output:\n%s", out)
+	}
+}
+
+func TestRenderHumanWithoutKEV(t *testing.T) {
+	report := sampleReport()
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, report); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	if strings.Contains(buf.String(), "KEV") {
+		t.Fatalf("KEV line should not appear without KnownExploited:\n%s", buf.String())
+	}
+}
+
+func TestRenderHumanWithEnrichment(t *testing.T) {
+	report := sampleReport()
+	report.Findings[0].Enrichment = &domain.Enrichment{
+		Source:         "test",
+		Mitigation:     "Upgrade to 2.4.51",
+		PoCURL:         "https://example.test/poc",
+		PatchCommitURL: "https://example.test/commit",
+	}
+
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, report); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	out := buf.String()
+	for _, want := range []string{"Mitigation", "Upgrade to 2.4.51", "PoC", "Patch"} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("output missing %q\n%s", want, out)
+		}
+	}
+}
+
+func TestRenderHumanWithAttribution(t *testing.T) {
+	report := sampleReport()
+	report.Findings[0].Enrichment = &domain.Enrichment{
+		Source:      "test",
+		Mitigation:  "upgrade",
+		Attribution: &domain.Attribution{Source: "example.org", License: "CC-BY-4.0"},
+	}
+
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, report); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "Enrichment data:") {
+		t.Fatalf("expected attribution footer:\n%s", out)
+	}
+	if !strings.Contains(out, "example.org") || !strings.Contains(out, "CC-BY-4.0") {
+		t.Fatalf("attribution not rendered correctly:\n%s", out)
+	}
+}
+
+func TestRenderHumanNoAttributionWithoutEnrichment(t *testing.T) {
+	report := sampleReport()
+
+	var buf bytes.Buffer
+	if err := RenderHuman(&buf, report); err != nil {
+		t.Fatalf("RenderHuman: %v", err)
+	}
+	if strings.Contains(buf.String(), "Enrichment data:") {
+		t.Fatalf("attribution footer should not appear without enrichment:\n%s", buf.String())
+	}
+}
+
+func TestRenderHumanQuiet(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderHumanWithOptions(&buf, sampleReport(), RenderOptions{Quiet: true}); err != nil {
+		t.Fatalf("RenderHumanWithOptions: %v", err)
+	}
+	out := strings.TrimSpace(buf.String())
+	if out != "CVE-2021-41773 AFFECTED" {
+		t.Fatalf("quiet output = %q", out)
+	}
+}
+
+func TestRenderHumanVerbose(t *testing.T) {
+	report := sampleReport()
+	report.Findings[0].Why.Steps = []string{"step one", "step two"}
+
+	var buf bytes.Buffer
+	if err := RenderHumanWithOptions(&buf, report, RenderOptions{Verbose: true}); err != nil {
+		t.Fatalf("RenderHumanWithOptions: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "step one") || !strings.Contains(out, "step two") {
+		t.Fatalf("verbose steps missing:\n%s", out)
+	}
+	if !strings.Contains(out, "[-] Why") {
+		t.Fatalf("expected Why section marker:\n%s", out)
 	}
 }
 
@@ -87,6 +250,7 @@ func TestRenderJSONHasRequiredFields(t *testing.T) {
 		}
 	}
 }
+
 func TestRenderJSONEvidenceSnakeCase(t *testing.T) {
 	report := sampleReport()
 	report.Findings[0].Evidence = []domain.Evidence{
@@ -137,36 +301,7 @@ func TestRenderJSONNoHTMLEscape(t *testing.T) {
 		t.Fatalf("expected literal >= in JSON output\n%s", out)
 	}
 }
-func TestRenderHumanWithKEV(t *testing.T) {
-	report := sampleReport()
-	report.Findings[0].KnownExploited = &domain.KEVInfo{
-		CVEID:     "CVE-2021-41773",
-		DateAdded: "2021-11-03",
-	}
 
-	var buf bytes.Buffer
-	if err := RenderHuman(&buf, report); err != nil {
-		t.Fatalf("RenderHuman: %v", err)
-	}
-	out := buf.String()
-	if !strings.Contains(out, "KEV") {
-		t.Fatalf("expected KEV line in output:\n%s", out)
-	}
-	if !strings.Contains(out, "2021-11-03") {
-		t.Fatalf("expected date in output:\n%s", out)
-	}
-}
-
-func TestRenderHumanWithoutKEV(t *testing.T) {
-	report := sampleReport()
-	var buf bytes.Buffer
-	if err := RenderHuman(&buf, report); err != nil {
-		t.Fatalf("RenderHuman: %v", err)
-	}
-	if strings.Contains(buf.String(), "KEV") {
-		t.Fatalf("KEV line should not appear without KnownExploited:\n%s", buf.String())
-	}
-}
 func TestRenderJSONLBasic(t *testing.T) {
 	var buf bytes.Buffer
 	if err := RenderJSONL(&buf, sampleReport()); err != nil {
@@ -225,6 +360,7 @@ func TestRenderJSONLEmpty(t *testing.T) {
 		t.Fatalf("expected empty output, got: %q", buf.String())
 	}
 }
+
 func TestRenderSARIFValid(t *testing.T) {
 	var buf bytes.Buffer
 	if err := RenderSARIF(&buf, sampleReport(), "test-version"); err != nil {
@@ -325,56 +461,58 @@ func TestRenderSARIFEmptyReport(t *testing.T) {
 		t.Fatalf("expected 1 run even if empty, got %d", len(parsed.Runs))
 	}
 }
-func TestRenderHumanWithEnrichment(t *testing.T) {
-	report := sampleReport()
-	report.Findings[0].Enrichment = &domain.Enrichment{
-		Source:         "dbcve",
-		Mitigation:     "Upgrade to 2.4.51",
-		PoCURL:         "https://example.test/poc",
-		PatchCommitURL: "https://example.test/commit",
-	}
 
+func TestRenderExplainHumanBasicFull(t *testing.T) {
 	var buf bytes.Buffer
-	if err := RenderHuman(&buf, report); err != nil {
-		t.Fatalf("RenderHuman: %v", err)
+	if err := RenderExplainHuman(&buf, sampleExplainFull()); err != nil {
+		t.Fatalf("RenderExplainHuman: %v", err)
 	}
 	out := buf.String()
-	for _, want := range []string{"Mitigation", "Upgrade to 2.4.51", "PoC", "Patch"} {
+	for _, want := range []string{"[+] CVE-2021-41773", "AFFECTED", "Apache HTTP Server", "2.4.49", ">=2.4.0 <2.4.51", "2.4.51", "STRONG"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("output missing %q\n%s", want, out)
 		}
 	}
 }
 
-func TestRenderHumanWithAttribution(t *testing.T) {
-	report := sampleReport()
-	report.Findings[0].Enrichment = &domain.Enrichment{
-		Source:      "dbcve",
-		Mitigation:  "upgrade",
-		Attribution: &domain.Attribution{Source: "dbcve.org", License: "CC-BY-4.0"},
-	}
+func TestRenderExplainHumanNotAffectedFull(t *testing.T) {
+	rep := sampleExplainFull()
+	rep.Applicable = false
+	rep.Match.Matched = false
 
 	var buf bytes.Buffer
-	if err := RenderHuman(&buf, report); err != nil {
-		t.Fatalf("RenderHuman: %v", err)
+	if err := RenderExplainHuman(&buf, rep); err != nil {
+		t.Fatalf("RenderExplainHuman: %v", err)
 	}
-	out := buf.String()
-	if !strings.Contains(out, "Enrichment data:") {
-		t.Fatalf("expected attribution footer:\n%s", out)
-	}
-	if !strings.Contains(out, "dbcve.org") || !strings.Contains(out, "CC-BY-4.0") {
-		t.Fatalf("attribution not rendered correctly:\n%s", out)
+	if !strings.Contains(buf.String(), "NOT AFFECTED") {
+		t.Fatalf("expected NOT AFFECTED:\n%s", buf.String())
 	}
 }
 
-func TestRenderHumanNoAttributionWithoutEnrichment(t *testing.T) {
-	report := sampleReport()
-
+func TestRenderExplainHumanQuiet(t *testing.T) {
 	var buf bytes.Buffer
-	if err := RenderHuman(&buf, report); err != nil {
-		t.Fatalf("RenderHuman: %v", err)
+	if err := RenderExplainHumanWithOptions(&buf, sampleExplainFull(), RenderOptions{Quiet: true}); err != nil {
+		t.Fatalf("RenderExplainHumanWithOptions: %v", err)
 	}
-	if strings.Contains(buf.String(), "Enrichment data:") {
-		t.Fatalf("attribution footer should not appear without enrichment:\n%s", buf.String())
+	out := strings.TrimSpace(buf.String())
+	if out != "CVE-2021-41773 AFFECTED" {
+		t.Fatalf("quiet output = %q", out)
+	}
+}
+
+func TestRenderExplainJSONFull(t *testing.T) {
+	var buf bytes.Buffer
+	if err := RenderExplainJSON(&buf, sampleExplainFull()); err != nil {
+		t.Fatalf("RenderExplainJSON: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &parsed); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, buf.String())
+	}
+	if parsed["vulnerability_id"] != "CVE-2021-41773" {
+		t.Fatalf("vulnerability_id = %v", parsed["vulnerability_id"])
+	}
+	if parsed["decision"] != "affected" {
+		t.Fatalf("decision = %v", parsed["decision"])
 	}
 }

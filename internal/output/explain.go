@@ -33,74 +33,73 @@ func RenderExplainHumanWithOptions(w io.Writer, r ExplainReport, opts RenderOpti
 		return err
 	}
 
-	fmt.Fprintln(w, r.Vulnerability.ID)
+	fmt.Fprintf(w, "[+] %s\n", r.Vulnerability.ID)
 	fmt.Fprintln(w)
 
-	fmt.Fprintln(w, "Decision")
 	decision := "NOT AFFECTED"
 	if r.Applicable {
 		decision = "AFFECTED"
 	}
-	fmt.Fprintf(w, "  %s\n", decision)
+	fmt.Fprintln(w, "    [+] Decision")
+	fmt.Fprintf(w, "        [*] Status       %s\n", decision)
+	if r.Confidence != "" {
+		fmt.Fprintf(w, "        [*] Confidence   %s\n", strings.ToUpper(r.Confidence))
+	}
 	fmt.Fprintln(w)
 
-	fmt.Fprintln(w, "Identity")
+	fmt.Fprintln(w, "    [+] Identity")
 	if r.Target.Product != "" {
-		fmt.Fprintf(w, "  Product  : %s\n", r.Target.Product)
+		fmt.Fprintf(w, "        [*] Product      %s\n", r.Target.Product)
 	}
 	if r.Target.Version != "" {
-		fmt.Fprintf(w, "  Version  : %s\n", r.Target.Version)
+		fmt.Fprintf(w, "        [*] Version      %s\n", r.Target.Version)
 	}
 	if r.Target.PURL != "" {
-		fmt.Fprintf(w, "  PURL     : %s\n", r.Target.PURL)
+		fmt.Fprintf(w, "        [*] PURL         %s\n", r.Target.PURL)
 	}
 	if r.Target.ResolvedCPE != "" {
-		fmt.Fprintf(w, "  CPE      : %s\n", r.Target.ResolvedCPE)
+		fmt.Fprintf(w, "        [*] CPE          %s\n", r.Target.ResolvedCPE)
 	}
 	fmt.Fprintln(w)
 
 	if r.Match.Criteria != "" {
-		fmt.Fprintln(w, "Applicability")
-		fmt.Fprintf(w, "  Source   : %s\n", r.Vulnerability.Source)
+		fmt.Fprintln(w, "    [+] Applicability")
+		fmt.Fprintf(w, "        [*] Source       %s\n", r.Vulnerability.Source)
 		if r.Match.Range != "" {
-			fmt.Fprintf(w, "  Range    : %s\n", r.Match.Range)
+			fmt.Fprintf(w, "        [*] Range        %s\n", r.Match.Range)
 		}
-		fmt.Fprintf(w, "  Criteria : %s\n", r.Match.Criteria)
+		fmt.Fprintf(w, "        [*] Criteria     %s\n", r.Match.Criteria)
 		result := "NO MATCH"
 		if r.Applicable {
 			result = "MATCH"
 		}
-		fmt.Fprintf(w, "  Result   : %s\n", result)
+		fmt.Fprintf(w, "        [*] Result       %s\n", result)
 		fmt.Fprintln(w)
 	}
 
 	if r.Fixed != "" {
-		fmt.Fprintln(w, "Fixed")
-		fmt.Fprintf(w, "  %s\n", r.Fixed)
+		fmt.Fprintln(w, "    [+] Fixed")
+		fmt.Fprintf(w, "        [*] Version      %s\n", r.Fixed)
 		fmt.Fprintln(w)
 	}
 
 	why := matcher.BuildWhy(r.TargetCPE, r.Match)
 	if len(why.Steps) > 0 {
-		fmt.Fprintln(w, "Why")
+		fmt.Fprintln(w, "    [+] Why")
 		for _, step := range why.Steps {
-			fmt.Fprintf(w, "  - %s\n", step)
+			fmt.Fprintf(w, "        • %s\n", step)
 		}
 		fmt.Fprintln(w)
 	}
 
 	if len(r.Vulnerability.References) > 0 {
-		fmt.Fprintln(w, "Evidence")
+		fmt.Fprintln(w, "    [+] Evidence")
 		for _, ref := range r.Vulnerability.References {
-			fmt.Fprintf(w, "  [%s] reference: %s\n", ref.Source, ref.URL)
+			fmt.Fprintf(w, "        [*] [%s] %s\n", ref.Source, ref.URL)
 		}
 		fmt.Fprintln(w)
 	}
 
-	if r.Confidence != "" {
-		fmt.Fprintln(w, "Confidence")
-		fmt.Fprintf(w, "  %s\n", strings.ToUpper(r.Confidence))
-	}
 	return nil
 }
 
