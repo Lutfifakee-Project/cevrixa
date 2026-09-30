@@ -39,6 +39,15 @@ func TestParseSBOMArgsFlags(t *testing.T) {
 	}
 }
 
+func TestParseSBOMArgsFailOn(t *testing.T) {
+	if _, err := parseSBOMArgs([]string{"--fail-on", "critical"}); err != nil {
+		t.Fatalf("severity gate should be accepted: %v", err)
+	}
+	if _, err := parseSBOMArgs([]string{"--fail-on", "critcal"}); err == nil {
+		t.Fatal("an unknown gate must be rejected instead of silently disabling the check")
+	}
+}
+
 func TestReadSBOMIntegration(t *testing.T) {
 	raw := `{
       "bomFormat": "CycloneDX",

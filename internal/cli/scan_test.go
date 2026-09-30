@@ -61,6 +61,15 @@ func TestReadTargetsJSONArray(t *testing.T) {
 	}
 }
 
+func TestParseScanArgsFailOn(t *testing.T) {
+	if _, err := parseScanArgs([]string{"--fail-on", "critical"}); err != nil {
+		t.Fatalf("severity gate should be accepted: %v", err)
+	}
+	if _, err := parseScanArgs([]string{"--fail-on", "critcal"}); err == nil {
+		t.Fatal("an unknown gate must be rejected instead of silently disabling the check")
+	}
+}
+
 func TestReadTargetsJSONL(t *testing.T) {
 	raw := `{"product": "Apache HTTP Server", "version": "2.4.49"}
 {"purl": "pkg:pypi/django@4.2.0"}

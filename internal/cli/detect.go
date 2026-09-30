@@ -193,13 +193,8 @@ func validateDetectFlags(f detectFlags) error {
 	default:
 		return fmt.Errorf("detect: unsupported --output %q (supported: human, json, jsonl, sarif)", f.Output)
 	}
-	if f.FailOn != "" && !domain.ValidGate(f.FailOn) {
-		// A typo here used to disable the CI gate silently, exiting 0 on a
-		// vulnerable target. Validate instead of ignoring.
-		return fmt.Errorf(
-			"detect: unsupported --fail-on %q (supported: none, any, affected, inconclusive, kev, low, medium, high, critical)",
-			f.FailOn,
-		)
+	if err := validateFailOn("detect", f.FailOn); err != nil {
+		return err
 	}
 	return nil
 }

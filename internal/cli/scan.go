@@ -144,6 +144,9 @@ func parseScanArgs(args []string) (scanFlags, error) {
 	default:
 		return f, fmt.Errorf("scan: unsupported --output %q (supported: human, json, jsonl, sarif)", f.Output)
 	}
+	if err := validateFailOn("scan", f.FailOn); err != nil {
+		return f, err
+	}
 	return f, nil
 }
 
@@ -207,7 +210,7 @@ Arguments:
 Flags:
   --with-kev           Enrich findings with CISA KEV data
   --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
-  --fail-on <level>    Exit non-zero if any finding matches: any, affected, kev
+  --fail-on <level>    Exit non-zero if any finding matches: none, any, affected, inconclusive, kev, or a severity (low, medium, high, critical)
   --output <fmt>       Output format: human (default), json, jsonl, or sarif
   -h, --help           Show this help
 
