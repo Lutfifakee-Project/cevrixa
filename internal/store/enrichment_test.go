@@ -10,7 +10,7 @@ import (
 func TestSaveAndGetEnrichment(t *testing.T) {
 	s := openTestStore(t)
 	e := domain.Enrichment{
-		Source:          "dbcve",
+		Source:          "example-enricher",
 		VulnerabilityID: "CVE-2021-41773",
 		Status:          "complete",
 		Summary:         "test",
@@ -20,7 +20,7 @@ func TestSaveAndGetEnrichment(t *testing.T) {
 		t.Fatalf("SaveEnrichment: %v", err)
 	}
 
-	got, err := s.GetEnrichment("CVE-2021-41773", "dbcve")
+	got, err := s.GetEnrichment("CVE-2021-41773", "example-enricher")
 	if err != nil {
 		t.Fatalf("GetEnrichment: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestSaveEnrichmentRequiresFields(t *testing.T) {
 
 func TestGetEnrichmentNotFound(t *testing.T) {
 	s := openTestStore(t)
-	if _, err := s.GetEnrichment("CVE-MISSING", "dbcve"); err == nil {
+	if _, err := s.GetEnrichment("CVE-MISSING", "example-enricher"); err == nil {
 		t.Fatal("expected not found error")
 	}
 }
@@ -49,13 +49,13 @@ func TestGetEnrichmentNotFound(t *testing.T) {
 func TestEnrichmentUpsert(t *testing.T) {
 	s := openTestStore(t)
 	_ = s.SaveEnrichment(domain.Enrichment{
-		Source: "dbcve", VulnerabilityID: "CVE-X", Mitigation: "first",
+		Source: "example-enricher", VulnerabilityID: "CVE-X", Mitigation: "first",
 	})
 	_ = s.SaveEnrichment(domain.Enrichment{
-		Source: "dbcve", VulnerabilityID: "CVE-X", Mitigation: "second",
+		Source: "example-enricher", VulnerabilityID: "CVE-X", Mitigation: "second",
 	})
 
-	got, _ := s.GetEnrichment("CVE-X", "dbcve")
+	got, _ := s.GetEnrichment("CVE-X", "example-enricher")
 	if got.Mitigation != "second" {
 		t.Fatalf("Mitigation = %q", got.Mitigation)
 	}
@@ -68,13 +68,13 @@ func TestEnrichmentUpsert(t *testing.T) {
 func TestGetEnrichmentAny(t *testing.T) {
 	s := openTestStore(t)
 	_ = s.SaveEnrichment(domain.Enrichment{
-		Source: "dbcve", VulnerabilityID: "CVE-X", Mitigation: "x",
+		Source: "example-enricher", VulnerabilityID: "CVE-X", Mitigation: "x",
 	})
 	got, err := s.GetEnrichmentAny("CVE-X", "other-source")
 	if err != nil {
 		t.Fatalf("GetEnrichmentAny: %v", err)
 	}
-	if got.Source != "dbcve" {
+	if got.Source != "example-enricher" {
 		t.Fatalf("Source = %q", got.Source)
 	}
 }

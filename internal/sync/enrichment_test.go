@@ -163,9 +163,9 @@ func TestSyncEnrichmentNoIDs(t *testing.T) {
 func TestSaveEnrichmentsBulk(t *testing.T) {
 	s := openEnrichStore(t)
 	items := []domain.Enrichment{
-		{Source: "dbcve", VulnerabilityID: "CVE-1", Mitigation: "x"},
-		{Source: "dbcve", VulnerabilityID: "", Mitigation: "skip"},
-		{Source: "dbcve", VulnerabilityID: "CVE-2", Mitigation: "y"},
+		{Source: "example-enricher", VulnerabilityID: "CVE-1", Mitigation: "x"},
+		{Source: "example-enricher", VulnerabilityID: "", Mitigation: "skip"},
+		{Source: "example-enricher", VulnerabilityID: "CVE-2", Mitigation: "y"},
 	}
 	n, err := SaveEnrichmentsBulk(items, s)
 	if err != nil {

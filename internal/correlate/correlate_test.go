@@ -66,7 +66,7 @@ func TestCorrelateAllAliasOverlap(t *testing.T) {
 func TestCorrelateAllEnrichmentAttached(t *testing.T) {
 	v := domain.Vulnerability{ID: "CVE-2021-41773", Source: "nvd"}
 	e := domain.Enrichment{
-		Source:          "dbcve",
+		Source:          "example-enricher",
 		VulnerabilityID: "CVE-2021-41773",
 		Risk:            &domain.Risk{Severity: "CRITICAL"},
 	}
@@ -76,19 +76,19 @@ func TestCorrelateAllEnrichmentAttached(t *testing.T) {
 	}
 	var found bool
 	for _, ev := range got[0].Evidence {
-		if ev.Kind == domain.EvidenceKindSeverity && ev.Source == "dbcve" && ev.Value == "CRITICAL" {
+		if ev.Kind == domain.EvidenceKindSeverity && ev.Source == "example-enricher" && ev.Value == "CRITICAL" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("expected severity evidence from dbcve")
+		t.Fatalf("expected severity evidence from example-enricher")
 	}
 }
 
 func TestCorrelateAllEnrichmentWithoutIDIsSkipped(t *testing.T) {
 	v := domain.Vulnerability{ID: "CVE-2021-41773", Source: "nvd"}
 	e := domain.Enrichment{
-		Source: "dbcve",
+		Source: "example-enricher",
 		Risk:   &domain.Risk{Severity: "CRITICAL"},
 	}
 	got := CorrelateAll([]domain.Vulnerability{v}, []domain.Enrichment{e})
@@ -96,7 +96,7 @@ func TestCorrelateAllEnrichmentWithoutIDIsSkipped(t *testing.T) {
 		t.Fatalf("expected 1 group, got %d", len(got))
 	}
 	for _, ev := range got[0].Evidence {
-		if ev.Source == "dbcve" {
+		if ev.Source == "example-enricher" {
 			t.Fatalf("enrichment without VulnerabilityID must be skipped")
 		}
 	}

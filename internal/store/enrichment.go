@@ -135,7 +135,8 @@ func (s *Store) DeleteAllEnrichments() error {
 }
 
 // ListCVEIDs returns all unique vulnerability IDs starting with "CVE-"
-// that are already in the local store. Used by DBCVE sync --from-store.
+// that are already in the local store. Used by enrichment sync when it targets
+// the identifiers already present in the store.
 func (s *Store) ListCVEIDs() ([]string, error) {
 	rows, err := s.db.Query(`
 		SELECT DISTINCT id FROM vulnerabilities

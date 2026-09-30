@@ -35,7 +35,7 @@ func TestCollectVulnEvidenceSkipsEmptyAliases(t *testing.T) {
 
 func TestCollectEnrichmentNoZeroValue(t *testing.T) {
 	e := domain.Enrichment{
-		Source: "dbcve",
+		Source: "example-enricher",
 		Risk: &domain.Risk{
 			Severity: "",
 			CVSS:     0,
@@ -57,7 +57,7 @@ func TestCollectEnrichmentNoZeroValue(t *testing.T) {
 
 func TestCollectEnrichmentKEVTrueOnly(t *testing.T) {
 	yes := domain.Enrichment{
-		Source: "dbcve",
+		Source: "example-enricher",
 		Risk:   &domain.Risk{KEV: true},
 	}
 	ev := enrichmentEvidence(yes)
@@ -74,7 +74,7 @@ func TestCollectEnrichmentKEVTrueOnly(t *testing.T) {
 
 func TestCollectEnrichmentKEVFalseNoEvidence(t *testing.T) {
 	no := domain.Enrichment{
-		Source: "dbcve",
+		Source: "example-enricher",
 		Risk:   &domain.Risk{KEV: false},
 	}
 	ev := enrichmentEvidence(no)
@@ -87,10 +87,10 @@ func TestCollectEnrichmentKEVFalseNoEvidence(t *testing.T) {
 
 func TestCollectSkipsAttributionAndSummary(t *testing.T) {
 	e := domain.Enrichment{
-		Source:      "dbcve",
+		Source:      "example-enricher",
 		Summary:     "some summary",
 		Confidence:  "high",
-		Attribution: &domain.Attribution{Source: "dbcve"},
+		Attribution: &domain.Attribution{Source: "example-enricher"},
 	}
 	ev := enrichmentEvidence(e)
 	for _, x := range ev {
@@ -102,7 +102,7 @@ func TestCollectSkipsAttributionAndSummary(t *testing.T) {
 
 func TestCollectRiskCVSSUsesCanonicalString(t *testing.T) {
 	e := domain.Enrichment{
-		Source: "dbcve",
+		Source: "example-enricher",
 		Risk:   &domain.Risk{CVSS: 9.8, CVSSVersion: "3.1"},
 	}
 	ev := enrichmentEvidence(e)
