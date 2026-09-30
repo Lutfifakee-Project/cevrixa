@@ -234,6 +234,69 @@ func TestMatchPackageVersionsListExact(t *testing.T) {
 		t.Fatalf("Mode = %q, want exact", got.Mode)
 	}
 }
+func opensslDebianVuln() domain.Vulnerability {
+	return domain.Vulnerability{
+		ID:     "GHSA-deb-1",
+		Source: "osv",
+		PackageApplicability: []domain.PackageApplicability{
+			{
+				Name:      "openssl",
+				Ecosystem: "Debian",
+				PURL:      "pkg:deb/debian/openssl",
+				Ranges: []domain.PackageRange{
+					{
+						Type: "ECOSYSTEM",
+						Events: []domain.PackageRangeEvent{
+							{Introduced: "0"},
+							{Fixed: "1.1.2"},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func TestMatchPackageDebianLetterSuffix(t *testing.T) {
+	// Regression: openssl 1.1.1c-1ubuntu1 used to be silently skipped because
+	// the version could not be parsed, so an affected package produced zero
+	// findings and exit code 0.
+	purl, err := domain.ParsePURL("pkg:deb/debian/openssl@1.1.1c-1ubuntu1")
+	if err != nil {
+		t.Fatalf("ParsePURL: %v", err)
+	}
+	got, ok := matchPackage(purl, opensslDebianVuln())
+	if !ok {
+		t.Fatal("expected a match attempt")
+	}
+	if !got.Matched {
+		t.Fatalf("1.1.1c-1ubuntu1 must be affected (< 1.1.2), got %+v", got)
+	}
+	if got.Fixed != "1.1.2" {
+		t.Fatalf("Fixed = %q, want 1.1.2", got.Fixed)
+	}
+}
+
+func TestMatchPackageUncomparableVersionIsUndecided(t *testing.T) {
+	purl, err := domain.ParsePURL("pkg:deb/debian/openssl@not-a-version")
+	if err != nil {
+		t.Fatalf("ParsePURL: %v", err)
+	}
+	got, ok := matchPackage(purl, opensslDebianVuln())
+	if !ok {
+		t.Fatal("an uncomparable version must be reported, not silently skipped")
+	}
+	if got.Matched {
+		t.Fatalf("uncomparable version must not be reported as affected: %+v", got)
+	}
+	if !got.Undecided {
+		t.Fatalf("expected Undecided, got %+v", got)
+	}
+	if got.Reason == "" {
+		t.Fatal("an undecided package result must carry a reason")
+	}
+}
+
 func TestMatchPackageDebianEpoch(t *testing.T) {
 	purl, err := domain.ParsePURL("pkg:deb/debian/openssl@1.1.1")
 	if err != nil {

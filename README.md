@@ -17,7 +17,7 @@ why?
 
 ## Status
 
-**v0.2.0** — detection reliability. See [CHANGELOG.md](CHANGELOG.md) for what
+**v0.2.1** — detection reliability. See [CHANGELOG.md](CHANGELOG.md) for what
 changed and why.
 
 ## Install
@@ -235,6 +235,14 @@ provenance back to its source.
     make fmt      # gofmt -s -w .
 
 ## Roadmap
+
+Implemented in v0.2.1:
+
+- Package versions with a letter suffix are parsed instead of rejected
+  (`openssl 1.1.1c`), and Debian revisions and RPM releases sort after the plain
+  version instead of below it
+- A package whose version cannot be compared is reported as `inconclusive` with
+  the reason, instead of being dropped from the results
 
 Implemented in v0.2.0 (detection reliability):
 

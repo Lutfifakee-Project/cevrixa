@@ -306,6 +306,54 @@ func TestStatusForResultUndecidedNeverAffected(t *testing.T) {
 	}
 }
 
+func TestDetectDebianLetterSuffixVersionIsAffected(t *testing.T) {
+	// Regression from manual verification: this exact target returned zero
+	// findings with exit code 0, because openssl 1.1.1c could not be parsed and
+	// the package was skipped without a word.
+	report, err := Detect(domain.Target{PURL: "pkg:deb/debian/openssl@1.1.1c-1ubuntu1"}, Options{})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+
+	var found bool
+	for _, f := range report.Findings {
+		if f.VulnerabilityID != "GHSA-deb-1" {
+			continue
+		}
+		found = true
+		if f.Status != domain.FindingStatusAffected {
+			t.Fatalf("status = %q, want affected", f.Status)
+		}
+		if len(f.FixedVersions) != 1 || f.FixedVersions[0] != "1.1.2" {
+			t.Fatalf("FixedVersions = %v, want [1.1.2]", f.FixedVersions)
+		}
+	}
+	if !found {
+		t.Fatalf("expected GHSA-deb-1 for openssl 1.1.1c-1ubuntu1, got %+v", report.Findings)
+	}
+}
+
+func TestDetectUncomparablePackageVersionIsInconclusive(t *testing.T) {
+	report, err := Detect(domain.Target{PURL: "pkg:deb/debian/openssl@not-a-version"}, Options{})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+
+	var found bool
+	for _, f := range report.Findings {
+		if f.VulnerabilityID != "GHSA-deb-1" {
+			continue
+		}
+		found = true
+		if f.Status != domain.FindingStatusInconclusive {
+			t.Fatalf("status = %q, want inconclusive", f.Status)
+		}
+	}
+	if !found {
+		t.Fatalf("an uncomparable version must surface as inconclusive, got %+v", report.Findings)
+	}
+}
+
 func TestDetectAttachesEnrichment(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 	s, err := store.Open(dbPath)

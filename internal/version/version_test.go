@@ -206,6 +206,100 @@ func TestParseLenientRejectsGarbage(t *testing.T) {
 	}
 }
 
+func TestParseLetterSuffixOrdering(t *testing.T) {
+	plain := MustParse("1.1.1")
+	a := MustParse("1.1.1a")
+	c := MustParse("1.1.1c")
+	next := MustParse("1.1.2")
+
+	if plain.Compare(c) >= 0 {
+		t.Fatal("1.1.1 must sort before 1.1.1c")
+	}
+	if c.Compare(plain) <= 0 {
+		t.Fatal("1.1.1c must sort after 1.1.1")
+	}
+	if a.Compare(c) >= 0 {
+		t.Fatal("1.1.1a must sort before 1.1.1c")
+	}
+	if c.Compare(next) >= 0 {
+		t.Fatal("1.1.1c must sort before 1.1.2")
+	}
+}
+
+func TestParseLenientDebianLetterSuffix(t *testing.T) {
+	// openssl 1.1.1c shipped in Ubuntu 19.10; rejecting this string silently
+	// dropped the target from package matching.
+	v, err := ParseLenient("1.1.1c-1ubuntu1")
+	if err != nil {
+		t.Fatalf("ParseLenient: %v", err)
+	}
+	if v.Raw() != "1.1.1c-1ubuntu1" {
+		t.Fatalf("Raw = %q", v.Raw())
+	}
+	if v.Compare(MustParse("1.1.2")) >= 0 {
+		t.Fatal("1.1.1c-1ubuntu1 must sort before 1.1.2")
+	}
+}
+
+func TestParseLenientDebianEpochWithLetterSuffix(t *testing.T) {
+	v, err := ParseLenient("1:1.1.1c-1ubuntu1")
+	if err != nil {
+		t.Fatalf("ParseLenient: %v", err)
+	}
+	if v.Compare(MustParse("1.1.2")) >= 0 {
+		t.Fatal("epoch must be stripped and 1.1.1c must sort before 1.1.2")
+	}
+}
+
+func TestParseRejectsInvalidComponents(t *testing.T) {
+	for _, s := range []string{"1a2", "1.2.x", "x1.2", "1.2.-1"} {
+		if _, err := Parse(s); err == nil {
+			t.Fatalf("Parse(%q) unexpectedly succeeded", s)
+		}
+	}
+}
+
+func TestParseDebianRevisionSortsAfterVersion(t *testing.T) {
+	base := MustParse("2.4.7")
+	rev1, err := ParseDebian("2.4.7-1")
+	if err != nil {
+		t.Fatalf("ParseDebian: %v", err)
+	}
+	rev2, err := ParseDebian("2.4.7-2")
+	if err != nil {
+		t.Fatalf("ParseDebian: %v", err)
+	}
+
+	if base.Compare(rev1) >= 0 {
+		t.Fatal("a Debian revision must sort after the plain version: 2.4.7 < 2.4.7-1")
+	}
+	if rev1.Compare(rev2) >= 0 {
+		t.Fatal("2.4.7-1 must sort before 2.4.7-2")
+	}
+}
+
+func TestParseRPMReleaseSortsAfterVersion(t *testing.T) {
+	base := MustParse("1.2.3")
+	rel, err := ParseRPM("1.2.3-4.el8")
+	if err != nil {
+		t.Fatalf("ParseRPM: %v", err)
+	}
+	if base.Compare(rel) >= 0 {
+		t.Fatal("an RPM release must sort after the plain version: 1.2.3 < 1.2.3-4.el8")
+	}
+}
+
+func TestParsePinnedVersionSuffixStillCompares(t *testing.T) {
+	// A criteria version such as 1.1.1c must be comparable, not rejected.
+	v, err := ParseLenient("1.1.1c")
+	if err != nil {
+		t.Fatalf("ParseLenient: %v", err)
+	}
+	if v.Compare(MustParse("1.1.1")) <= 0 {
+		t.Fatal("1.1.1c must be greater than 1.1.1")
+	}
+}
+
 func TestParseDebianBasic(t *testing.T) {
 	v, err := ParseDebian("2.4.7-1")
 	if err != nil {

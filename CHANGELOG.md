@@ -3,6 +3,44 @@
 All notable changes to Cevrixa are documented here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [v0.2.1] — 2026-09-30
+
+Silent false negative in package matching, found during manual verification of
+v0.2.0.
+
+### Fixed
+
+- **Package versions with a letter suffix were rejected, and that failure was
+  swallowed.** Debian style upstream versions such as `openssl 1.1.1c` failed to
+  parse, so `pkg:deb/debian/openssl@1.1.1c-1ubuntu1` returned zero findings with
+  exit code 0 even though the version sits inside an affected range. The parser
+  now accepts a trailing letter suffix as a post-release identifier
+  (`1.1.1 < 1.1.1c < 1.1.2`), and a version that still cannot be compared is
+  reported as `inconclusive` instead of being dropped.
+- **`ParseDebian` and `ParseRPM` ordering was inverted.** Package revisions were
+  attached as pre-release identifiers, so `2.4.7-1` sorted *below* `2.4.7` — the
+  opposite of Debian and RPM ordering, and the opposite of what their own
+  documentation claimed. Revisions and RPM releases are now post-release
+  identifiers: `2.4.7 < 2.4.7-1 < 2.4.7-2` and `1.2.3 < 1.2.3-4.el8`.
+- **A package whose ranges could not be evaluated was skipped in silence.** A
+  range with unparseable bounds is now reported as `inconclusive` as well.
+
+### Added
+
+- `engine.PackageMatchResult.Undecided` and `Reason`.
+- `version.Version` post-release identifiers, compared after the numeric core and
+  the pre-release part.
+- Regression tests for `openssl@1.1.1c-1ubuntu1` at matcher and engine level, and
+  ordering tests for Debian revisions and RPM releases.
+
+### Known gaps
+
+- Version semantics are still not dispatched per ecosystem: a Debian PURL is
+  compared with the generic parser instead of `ParseDebian`, so a version that
+  combines a letter suffix with a `-` part (for example `1.1.1c-1ubuntu1`
+  compared against a bound of exactly `1.1.1`) can still compare incorrectly.
+  `ParseDebian` and `ParseRPM` remain unused outside their own tests.
+
 ## [v0.2.0] — 2026-09-30
 
 Detection reliability. No new data sources were added: the goal of this release

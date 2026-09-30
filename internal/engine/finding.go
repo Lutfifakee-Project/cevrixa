@@ -77,6 +77,18 @@ func buildPackageFinding(purl domain.PURL, v domain.Vulnerability, pr PackageMat
 		},
 	}
 
+	if pr.Undecided {
+		// The package matched but its version could not be compared. Reporting
+		// nothing would present a gap in Cevrixa's knowledge as a clean result.
+		f.Status = domain.FindingStatusInconclusive
+		f.Why = domain.Why{
+			IdentityMatch: "package name+ecosystem matched target PURL",
+			VersionMatch:  "applicability could not be decided",
+			Steps:         []string{pr.Reason},
+			Questions:     []string{"is the installed version comparable with " + purl.Type + " ranges?"},
+		}
+	}
+
 	if pr.Fixed != "" {
 		f.FixedVersions = []string{pr.Fixed}
 		f.Why.FixedReason = "fixed in " + pr.Fixed

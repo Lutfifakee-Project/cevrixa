@@ -7,13 +7,19 @@ import (
 	"unicode"
 )
 
-// Version is a normalized software version with numeric core components and
-// optional SemVer-compatible pre-release identifiers. Build metadata is
-// accepted and intentionally ignored for comparison.
+// Version is a normalized software version with numeric core components,
+// optional SemVer-compatible pre-release identifiers, and optional post-release
+// identifiers. Build metadata is accepted and intentionally ignored for
+// comparison.
 type Version struct {
 	raw        string
 	components []uint64
 	prerelease []Identifier
+	// suffix holds post-release identifiers: text that sorts *after* the plain
+	// version. Debian style upstream versions carry a letter suffix
+	// (openssl 1.1.1c) and package revisions are post-release too, so
+	// 1.1.1 < 1.1.1c < 1.1.2 and 2.4.7 < 2.4.7-1.
+	suffix []Identifier
 }
 
 // Identifier represents one pre-release identifier.
@@ -60,17 +66,25 @@ func Parse(input string) (Version, error) {
 	}
 
 	components := make([]uint64, len(coreParts))
+	var suffix []Identifier
 	for i, part := range coreParts {
 		if part == "" {
 			return Version{}, fmt.Errorf("version %q: empty numeric component", input)
 		}
-		if !allDigits(part) {
+		digits, letters := splitLetterSuffix(part)
+		if !allDigits(digits) {
 			return Version{}, fmt.Errorf("version %q: invalid numeric component %q", input, part)
 		}
-		if len(part) > 1 && part[0] == '0' {
+		if letters != "" {
+			// Debian style upstream versions may carry a letter suffix, as in
+			// openssl 1.1.1c. Keeping it as a post-release identifier keeps
+			// 1.1.1 < 1.1.1c < 1.1.2 instead of rejecting the version.
+			suffix = append(suffix, Identifier{text: letters})
+		}
+		if len(digits) > 1 && digits[0] == '0' {
 			return Version{}, fmt.Errorf("version %q: leading zero in numeric component %q", input, part)
 		}
-		n, err := strconv.ParseUint(part, 10, 64)
+		n, err := strconv.ParseUint(digits, 10, 64)
 		if err != nil {
 			return Version{}, fmt.Errorf("version %q: invalid numeric component %q: %w", input, part, err)
 		}
@@ -109,6 +123,7 @@ func Parse(input string) (Version, error) {
 		raw:        input,
 		components: components,
 		prerelease: prerelease,
+		suffix:     suffix,
 	}, nil
 }
 
@@ -156,7 +171,9 @@ func (v Version) Compare(other Version) int {
 
 	// A release version has higher precedence than a pre-release version.
 	if len(v.prerelease) == 0 && len(other.prerelease) == 0 {
-		return 0
+		// Same numeric core and no pre-release: a post-release identifier
+		// sorts after the plain release, so 1.1.1 < 1.1.1c and 2.4.7 < 2.4.7-1.
+		return compareIdentifiers(v.suffix, other.suffix)
 	}
 	if len(v.prerelease) == 0 {
 		return 1
@@ -202,7 +219,74 @@ func (v Version) Compare(other Version) int {
 		}
 	}
 
+	return compareIdentifiers(v.suffix, other.suffix)
+}
+
+// compareIdentifiers orders two identifier lists: a shorter list that is a
+// prefix of the other sorts first, numeric identifiers sort before text ones,
+// and equal lists compare equal.
+func compareIdentifiers(a, b []Identifier) int {
+	max := len(a)
+	if len(b) > max {
+		max = len(b)
+	}
+	for i := 0; i < max; i++ {
+		if i >= len(a) {
+			return -1
+		}
+		if i >= len(b) {
+			return 1
+		}
+		x, y := a[i], b[i]
+		if x.numeric && y.numeric {
+			if x.number < y.number {
+				return -1
+			}
+			if x.number > y.number {
+				return 1
+			}
+			continue
+		}
+		if x.numeric != y.numeric {
+			if x.numeric {
+				return -1
+			}
+			return 1
+		}
+		if x.text < y.text {
+			return -1
+		}
+		if x.text > y.text {
+			return 1
+		}
+	}
 	return 0
+}
+
+// splitLetterSuffix splits a core component such as "1c" into its numeric part
+// ("1") and its trailing alphabetic part ("c"). A component that is not exactly
+// "<digits><letters>" is returned unchanged with an empty suffix, so that
+// invalid input still fails validation.
+func splitLetterSuffix(part string) (digits, letters string) {
+	i := 0
+	for i < len(part) && isDigitByte(part[i]) {
+		i++
+	}
+	if i == 0 || i == len(part) {
+		return part, ""
+	}
+	for j := i; j < len(part); j++ {
+		if !isLetterByte(part[j]) {
+			return part, ""
+		}
+	}
+	return part[:i], part[i:]
+}
+
+func isDigitByte(c byte) bool { return c >= '0' && c <= '9' }
+
+func isLetterByte(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }
 
 // Equal reports whether two parsed versions compare equal.
@@ -378,9 +462,9 @@ func isAllowedPrereleaseChar(r rune) bool {
 //	1:1.2.3-4
 //
 // Epoch (before ':') is stripped. The upstream version is compared using
-// the generic semantics; the Debian revision (after the last '-') is
-// captured and appended as a pre-release-like identifier so that
-// "2.4.7-1" < "2.4.7-2" and "2.4.7" < "2.4.7-1".
+// generic semantics, including Debian letter suffixes such as 1.1.1c. The
+// Debian revision (after the last '-') is captured as a post-release
+// identifier so that "2.4.7-1" < "2.4.7-2" and "2.4.7" < "2.4.7-1".
 //
 // This is a pragmatic approximation, not a full Debian policy implementation.
 func ParseDebian(s string) (Version, error) {
@@ -408,8 +492,7 @@ func ParseDebian(s string) (Version, error) {
 	}
 
 	if revision != "" {
-		rev := Identifier{text: "~rev~" + revision}
-		v.prerelease = append(v.prerelease, rev)
+		v.suffix = append(v.suffix, Identifier{text: "rev:" + revision})
 	}
 	v.raw = raw
 	return v, nil
@@ -420,8 +503,8 @@ func ParseDebian(s string) (Version, error) {
 //	1.2.3-4.el8
 //	2.4.49-1
 //
-// Structure is VERSION-RELEASE. The release is captured as a
-// pre-release-like identifier so that "1.2.3-4.el8" > "1.2.3" (version alone).
+// Structure is VERSION-RELEASE. The release is captured as a post-release
+// identifier so that "1.2.3-4.el8" > "1.2.3" (version alone).
 func ParseRPM(s string) (Version, error) {
 	raw := strings.TrimSpace(s)
 	if raw == "" {
@@ -442,7 +525,7 @@ func ParseRPM(s string) (Version, error) {
 	}
 
 	if release != "" {
-		v.prerelease = append(v.prerelease, Identifier{text: "~rel~" + release})
+		v.suffix = append(v.suffix, Identifier{text: "rel:" + release})
 	}
 	v.raw = raw
 	return v, nil

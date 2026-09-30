@@ -11,6 +11,13 @@ type PackageMatchResult struct {
 	Fixed    string
 	Mode     string
 	Criteria string
+
+	// Undecided reports that the package matched by name and ecosystem, but the
+	// target version could not be compared with the applicable ranges. The
+	// caller must not report the target as unaffected: an uncomparable version
+	// is a gap in Cevrixa's knowledge, not a clean result.
+	Undecided bool
+	Reason    string
 }
 
 type osvSegment struct {
@@ -40,6 +47,20 @@ func matchPackage(purl domain.PURL, vuln domain.Vulnerability) (PackageMatchResu
 					Range:    "exact version " + v,
 					Mode:     "exact",
 					Criteria: "pkg:" + purl.Type + "/" + pkg.Name,
+				}, true
+			}
+		}
+
+		// The package matched by name and ecosystem. If the target version
+		// cannot be compared with the applicable ranges, say so: silently
+		// returning nothing here would report an affected package as clean.
+		if len(pkg.Ranges) > 0 {
+			if _, err := version.ParseLenient(purl.Version); err != nil {
+				return PackageMatchResult{
+					Mode:      "undecided",
+					Criteria:  "pkg:" + purl.Type + "/" + pkg.Name,
+					Undecided: true,
+					Reason:    "target version " + purl.Version + " cannot be compared with " + ecosystem + " ranges",
 				}, true
 			}
 		}
@@ -82,7 +103,14 @@ func evalRange(purl domain.PURL, pkg domain.PackageApplicability, r domain.Packa
 	for _, seg := range segments {
 		res, ok := evalSegment(target, purl, pkg, seg)
 		if !ok {
-			continue
+			// A range whose bounds cannot be parsed or compared cannot be
+			// evaluated. Report that instead of skipping the package.
+			return PackageMatchResult{
+				Mode:      "undecided",
+				Criteria:  "pkg:" + purl.Type + "/" + pkg.Name,
+				Undecided: true,
+				Reason:    "range bounds for " + pkg.Name + " cannot be compared",
+			}, true
 		}
 		hasAttempt = true
 		if res.Matched {

@@ -90,7 +90,7 @@ func detectByPURL(target domain.Target, opts Options) (domain.Report, error) {
 		if !ok {
 			continue
 		}
-		if !pr.Matched {
+		if !pr.Matched && !pr.Undecided {
 			continue
 		}
 		f := buildPackageFinding(purl, v, pr, enrichmentsFor(opts, v.ID))
