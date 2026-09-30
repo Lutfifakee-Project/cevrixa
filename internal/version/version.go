@@ -436,7 +436,53 @@ func ParseLenient(input string) (Version, error) {
 		s = s[:idx]
 	}
 
-	return Parse(s)
+	v, err := Parse(s)
+	if err == nil {
+		return v, nil
+	}
+
+	// Real world versions break SemVer's no-leading-zero rule for numeric
+	// pre-release identifiers (sonicwall firmware 12.4.3-02854). Retry with
+	// those zeros removed so the version can still be compared instead of being
+	// reported as uncomparable.
+	if relaxed := stripPrereleaseLeadingZeros(s); relaxed != s {
+		if rv, rerr := Parse(relaxed); rerr == nil {
+			rv.raw = input
+			return rv, nil
+		}
+	}
+
+	return Version{}, err
+}
+
+// stripPrereleaseLeadingZeros removes leading zeros from numeric pre-release
+// identifiers, leaving anything that is not purely numeric untouched.
+func stripPrereleaseLeadingZeros(s string) string {
+	idx := strings.IndexByte(s, '-')
+	if idx < 0 || idx+1 >= len(s) {
+		return s
+	}
+	core, pre := s[:idx], s[idx+1:]
+	if build := strings.IndexByte(pre, '+'); build >= 0 {
+		pre = pre[:build]
+	}
+
+	ids := strings.Split(pre, ".")
+	changed := false
+	for i, id := range ids {
+		if len(id) > 1 && id[0] == '0' && allDigits(id) {
+			trimmed := strings.TrimLeft(id, "0")
+			if trimmed == "" {
+				trimmed = "0"
+			}
+			ids[i] = trimmed
+			changed = true
+		}
+	}
+	if !changed {
+		return s
+	}
+	return core + "-" + strings.Join(ids, ".")
 }
 
 func allDigits(s string) bool {

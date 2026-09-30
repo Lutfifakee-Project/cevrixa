@@ -109,7 +109,10 @@ func matchAndNode(node domain.ApplicabilityNode, target domain.CPE, v version.Ve
 			return nodeOutcome{reason: out.reason}
 		}
 		if !out.matched {
-			return nodeOutcome{reason: "no part of the AND configuration matched the target"}
+			// A child that does not match is an unmet requirement: the group
+			// only applies when that part holds, and Cevrixa has no information
+			// about components other than the target.
+			return nodeOutcome{reason: andRequirementReason(out.result.Criteria)}
 		}
 		if vulnerableMatch == nil && out.result.Matched {
 			r := out.result
@@ -228,6 +231,16 @@ func matchSingle(m domain.CPEMatch, target domain.CPE, v version.Version) (Resul
 		Fixed:    fixedVersion(m),
 		Mode:     classifyMode(m),
 	}, true
+}
+
+// andRequirementReason names the component an AND configuration needs but the
+// target does not provide, so an inconclusive verdict states what is missing
+// instead of claiming that nothing matched.
+func andRequirementReason(criteria string) string {
+	if criteria == "" {
+		return "AND configuration requires an additional component that is not the target"
+	}
+	return "AND configuration requires an additional component: " + criteria
 }
 
 func cpeFieldMatches(criteria, target string) bool {

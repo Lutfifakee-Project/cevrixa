@@ -300,6 +300,27 @@ func TestParsePinnedVersionSuffixStillCompares(t *testing.T) {
 	}
 }
 
+func TestParseLenientToleratesLeadingZeroPrerelease(t *testing.T) {
+	// sonicwall firmware 12.4.3-02854 was rejected outright, which made the
+	// whole version range uncomparable.
+	v, err := ParseLenient("12.4.3-02854")
+	if err != nil {
+		t.Fatalf("ParseLenient: %v", err)
+	}
+	if v.Raw() != "12.4.3-02854" {
+		t.Fatalf("Raw = %q, want the original input", v.Raw())
+	}
+	if v.Compare(MustParse("12.4.4")) >= 0 {
+		t.Fatal("12.4.3-02854 must sort before 12.4.4")
+	}
+	// The hyphenated part is still read as a pre-release, so it sorts before the
+	// plain release. Treating it as a build number needs per-ecosystem version
+	// semantics, which is a known gap.
+	if v.Compare(MustParse("12.4.3")) >= 0 {
+		t.Fatal("this parser treats -02854 as a pre-release, not a build number")
+	}
+}
+
 func TestParseDebianBasic(t *testing.T) {
 	v, err := ParseDebian("2.4.7-1")
 	if err != nil {

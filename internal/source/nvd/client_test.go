@@ -23,14 +23,17 @@ func TestClientMapsResponse(t *testing.T) {
           "vulnStatus": "Analyzed",
           "descriptions": [{"lang":"en","value":"Example vulnerability"}],
           "configurations": [{
-            "operator": "OR",
-            "negate": false,
-            "cpeMatch": [{
-              "vulnerable": true,
-              "criteria": "cpe:2.3:a:example:product:*:*:*:*:*:*:*:*",
-              "matchCriteriaId": "11111111-1111-1111-1111-111111111111",
-              "versionStartIncluding": "2.0.0",
-              "versionEndExcluding": "3.0.0"
+            "operator": "AND",
+            "nodes": [{
+              "operator": "OR",
+              "negate": false,
+              "cpeMatch": [{
+                "vulnerable": true,
+                "criteria": "cpe:2.3:a:example:product:*:*:*:*:*:*:*:*",
+                "matchCriteriaId": "11111111-1111-1111-1111-111111111111",
+                "versionStartIncluding": "2.0.0",
+                "versionEndExcluding": "3.0.0"
+              }]
             }]
           }],
           "references": [{"url":"https://example.org/advisory","tags":["vendor-advisory"]}]
@@ -66,12 +69,24 @@ func TestClientMapsResponse(t *testing.T) {
 	if vuln.ID != "CVE-2099-1234" || vuln.Source != "nvd" {
 		t.Fatalf("unexpected vulnerability: %+v", vuln)
 	}
-	if len(vuln.Applicability) != 1 || len(vuln.Applicability[0].Matches) != 1 {
+	// The API nests cpeMatch inside "nodes"; the wrapper node itself carries no
+	// matches. Asserting on the nested level is what catches a mapper that only
+	// reads "children".
+	if len(vuln.Applicability) != 1 {
 		t.Fatalf("unexpected applicability: %+v", vuln.Applicability)
 	}
-	match := vuln.Applicability[0].Matches[0]
+	if len(vuln.Applicability[0].Children) != 1 {
+		t.Fatalf("nested configuration nodes were not mapped: %+v", vuln.Applicability)
+	}
+	if len(vuln.Applicability[0].Children[0].Matches) != 1 {
+		t.Fatalf("cpeMatch inside nodes was not mapped: %+v", vuln.Applicability)
+	}
+	match := vuln.Applicability[0].Children[0].Matches[0]
 	if match.VersionStart != "2.0.0" || match.VersionStartMode != "including" || match.VersionEnd != "3.0.0" || match.VersionEndMode != "excluding" {
 		t.Fatalf("unexpected range: %+v", match)
+	}
+	if match.Criteria != "cpe:2.3:a:example:product:*:*:*:*:*:*:*:*" {
+		t.Fatalf("criteria was not mapped: %+v", match)
 	}
 }
 func TestClientWithDateRange(t *testing.T) {

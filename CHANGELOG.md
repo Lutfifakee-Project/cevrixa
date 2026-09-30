@@ -3,6 +3,63 @@
 All notable changes to Cevrixa are documented here. Versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [v0.2.2] — 2026-09-30
+
+The NVD CPE branch was never functional against real synced data.
+
+### Fixed
+
+- **CPE configuration nodes were read from the wrong JSON field.** NVD API 2.0
+  nests configuration nodes under `nodes`:
+
+      "configurations": [
+        {"operator": "AND", "nodes": [
+          {"operator": "OR", "negate": false, "cpeMatch": [ ... ]}
+        ]}
+      ]
+
+  but the response type only declared `json:"children"`. Every real NVD
+  configuration was therefore discarded while mapping, so each synced record was
+  stored with no CPE criteria at all. Measured against a real 7121 record
+  dataset: **0 records contained a `criteria` value**, and 2034 records had an
+  `applicability` node with no matches. `detect` and `explain` could not match
+  anything for CPE targets; every "AFFECTED" result seen before this release came
+  from the embedded test fixtures rather than from synced data. Both `nodes` and
+  the legacy `children` field are now accepted.
+- **An unmet `AND` requirement reported the wrong reason.** When one part of an
+  `AND` group matched and another did not, the verdict was correctly
+  `inconclusive` but the reason read "no part of the AND configuration matched
+  the target", which is false. The reason now names the missing component.
+- **Versions with leading zeros in a pre-release identifier were rejected.**
+  Firmware versions such as `12.4.3-02854` failed to parse, which made the whole
+  range uncomparable and the finding `inconclusive`. `ParseLenient` now tolerates
+  those zeros so the range can still be compared.
+- **Duplicate references inflated the evidence list.** NVD lists the same
+  advisory once per contributing source; a real record showed the same five URLs
+  repeated twice. References are now deduplicated by URL with their tags merged.
+
+### Changed
+
+- The NVD client test now uses the real API 2.0 shape (an `AND` wrapper with a
+  nested `OR` node) instead of a hand written shape that hid the defect.
+- `internal/source/nvd/mapper_test.go` adds coverage for the real shape, the
+  legacy shape, and end-to-end mapping through `mapVulnerability`.
+
+### Operational note
+
+- **Upgrading does not repair an existing database.** Records are keyed on
+  `(id, source)` and an unchanged CVE is never re-fetched, so rows written by an
+  earlier version keep their empty applicability. Re-run
+  `cevrixa sync nvd --days N` (or `--full`), or delete the database file, to
+  populate CPE criteria.
+
+### Known gaps
+
+- A hyphenated number such as `12.4.3-02854` is still read as a pre-release, so
+  it sorts *before* `12.4.3`. Firmware and distro build numbers sort after. This
+  needs per-ecosystem version semantics (dispatch on the PURL type), which is not
+  implemented yet; the comparison is decidable but that ordering can be wrong.
+
 ## [v0.2.1] — 2026-09-30
 
 Silent false negative in package matching, found during manual verification of

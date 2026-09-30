@@ -29,10 +29,31 @@ type apiDescription struct {
 }
 
 type apiConfigNode struct {
-	Operator string          `json:"operator"`
-	Negate   bool            `json:"negate"`
+	Operator string `json:"operator"`
+	Negate   bool   `json:"negate"`
+	// NVD API 2.0 nests configuration nodes under "nodes":
+	//
+	//	"configurations": [
+	//	  {"operator": "AND", "nodes": [
+	//	    {"operator": "OR", "negate": false, "cpeMatch": [ ... ]}
+	//	  ]}
+	//	]
+	//
+	// "children" is kept for older 1.1 style payloads and hand written
+	// fixtures. Reading only "children" silently discarded every real NVD
+	// configuration, which left each synced record without any CPE criteria.
+	Nodes    []apiConfigNode `json:"nodes"`
 	Children []apiConfigNode `json:"children"`
 	CPEMatch []apiCPEMatch   `json:"cpeMatch"`
+}
+
+// childNodes returns the nested configuration nodes of a node, accepting both
+// the API 2.0 "nodes" field and the legacy "children" field.
+func (n apiConfigNode) childNodes() []apiConfigNode {
+	if len(n.Nodes) > 0 {
+		return n.Nodes
+	}
+	return n.Children
 }
 
 type apiCPEMatch struct {

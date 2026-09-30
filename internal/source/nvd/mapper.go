@@ -1,6 +1,10 @@
 package nvd
 
-import "github.com/Lutfifakee-Project/cevrixa/internal/domain"
+import (
+	"strings"
+
+	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
+)
 
 func mapVulnerability(cve apiCVE) domain.Vulnerability {
 	result := domain.Vulnerability{
@@ -23,14 +27,7 @@ func mapVulnerability(cve apiCVE) domain.Vulnerability {
 		result.Summary = cve.Descriptions[0].Value
 	}
 
-	result.References = make([]domain.Reference, 0, len(cve.References))
-	for _, ref := range cve.References {
-		result.References = append(result.References, domain.Reference{
-			URL:    ref.URL,
-			Source: "nvd",
-			Tags:   append([]string(nil), ref.Tags...),
-		})
-	}
+	result.References = dedupeReferences(cve.References)
 
 	result.Applicability = make([]domain.ApplicabilityNode, 0, len(cve.Configurations))
 	for _, node := range cve.Configurations {
@@ -38,6 +35,48 @@ func mapVulnerability(cve apiCVE) domain.Vulnerability {
 	}
 
 	return result
+}
+
+// dedupeReferences collapses repeated URLs. NVD lists the same advisory once per
+// contributing source, which duplicated evidence and inflated evidence counts.
+func dedupeReferences(refs []apiReference) []domain.Reference {
+	index := make(map[string]int)
+	out := make([]domain.Reference, 0, len(refs))
+	for _, ref := range refs {
+		if ref.URL == "" {
+			continue
+		}
+		if i, ok := index[ref.URL]; ok {
+			out[i].Tags = mergeTags(out[i].Tags, ref.Tags)
+			continue
+		}
+		index[ref.URL] = len(out)
+		out = append(out, domain.Reference{
+			URL:    ref.URL,
+			Source: "nvd",
+			Tags:   append([]string(nil), ref.Tags...),
+		})
+	}
+	return out
+}
+
+func mergeTags(existing, extra []string) []string {
+	for _, tag := range extra {
+		if tag == "" {
+			continue
+		}
+		found := false
+		for _, have := range existing {
+			if strings.EqualFold(have, tag) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			existing = append(existing, tag)
+		}
+	}
+	return existing
 }
 
 func mapRisk(metrics apiMetrics) *domain.Risk {
@@ -77,7 +116,7 @@ func mapNode(node apiConfigNode) domain.ApplicabilityNode {
 		Children: make([]domain.ApplicabilityNode, 0, len(node.Children)),
 	}
 
-	for _, child := range node.Children {
+	for _, child := range node.childNodes() {
 		out.Children = append(out.Children, mapNode(child))
 	}
 

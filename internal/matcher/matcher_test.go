@@ -361,6 +361,46 @@ func TestBuildWhyUndecidedStatesQuestion(t *testing.T) {
 	}
 }
 
+func TestMatchCPEAndChildRequirementNamesTheMissingComponent(t *testing.T) {
+	// Real shape from CVE-2008-4128: cisco ios AND the 871 hardware platform.
+	vuln := domain.Vulnerability{
+		Applicability: []domain.ApplicabilityNode{
+			{
+				Operator: "AND",
+				Children: []domain.ApplicabilityNode{
+					{
+						Operator: "OR",
+						Matches: []domain.CPEMatch{
+							{Vulnerable: true, Criteria: "cpe:2.3:o:cisco:ios:12.4:*:*:*:*:*:*:*"},
+						},
+					},
+					{
+						Operator: "OR",
+						Matches: []domain.CPEMatch{
+							{Vulnerable: false, Criteria: "cpe:2.3:h:cisco:871_integrated_services_router:-:*:*:*:*:*:*:*"},
+						},
+					},
+				},
+			},
+		},
+	}
+	target := mustCPE(t, "cpe:2.3:o:cisco:ios:12.4:*:*:*:*:*:*:*")
+
+	got, err := MatchCPE(target, vuln)
+	if err != nil {
+		t.Fatalf("MatchCPE: %v", err)
+	}
+	if got.Matched || !got.Undecided {
+		t.Fatalf("an AND group with an unmet requirement must be undecided: %+v", got)
+	}
+	if !strings.Contains(got.Reason, "additional component") {
+		t.Fatalf("reason must name the missing requirement, got %q", got.Reason)
+	}
+	if strings.Contains(got.Reason, "no part") {
+		t.Fatalf("reason must not claim that nothing matched when a part did: %q", got.Reason)
+	}
+}
+
 func TestMatchCPEBoundaryInclusive(t *testing.T) {
 	vuln := domain.Vulnerability{
 		Applicability: []domain.ApplicabilityNode{

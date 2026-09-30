@@ -17,7 +17,7 @@ why?
 
 ## Status
 
-**v0.2.1** — detection reliability. See [CHANGELOG.md](CHANGELOG.md) for what
+**v0.2.2** — detection reliability. See [CHANGELOG.md](CHANGELOG.md) for what
 changed and why.
 
 ## Install
@@ -235,6 +235,13 @@ provenance back to its source.
     make fmt      # gofmt -s -w .
 
 ## Roadmap
+
+Implemented in v0.2.2:
+
+- NVD API 2.0 configuration nodes are read from `nodes` rather than `children`,
+  so synced records carry CPE criteria and CPE detection works against real data
+  instead of silently finding nothing (see the operational note in
+  [CHANGELOG.md](CHANGELOG.md) if you already have a database)
 
 Implemented in v0.2.1:
 
