@@ -1,6 +1,10 @@
 # Build output
 /bin/
 
+# Internal design notes. Kept local on purpose: these describe how Cevrixa is
+# planned and built, and are not part of the published repository.
+/docs/
+
 # Coverage
 /coverage.out
 /coverage.html

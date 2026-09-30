@@ -318,35 +318,8 @@ Current limitations:
 - Embedded fixtures are used when no local database is present. They are test
   data, not vulnerability intelligence.
 
-## Roadmap
-
-- [x] Initial project architecture
-- [x] Version intelligence
-- [x] CPE support
-- [x] PURL support
-- [x] Initial vulnerability database integration
-- [x] Basic detection engine
-- [x] Inconclusive detection state
-- [x] Explainable detection results
-- [ ] Product resolver improvements
-- [ ] CPE resolution improvements
-- [ ] Ecosystem-specific version semantics
-- [ ] Improved candidate filtering
-- [ ] Expanded SBOM support, starting with SPDX
-- [ ] Additional vulnerability data sources
-- [ ] Detection performance improvements
-- [ ] Reproducible detection tied to a database snapshot
-
 ## Documentation
 
-- [Positioning](docs/positioning.md) — what Cevrixa is, what it is not, and the
-  differentiators with their honest status
-- [Architecture](docs/architecture.md) — module boundaries, source interfaces,
-  data flow, repository layout, CI
-- [Detection](docs/detection.md) — detection states, applicability, version
-  evaluation, the finding model, evidence, conflicts, confidence
-- [Roadmap](docs/roadmap.md) — direction, released milestones, next, and known
-  gaps
 - [CHANGELOG.md](CHANGELOG.md) — what changed in each release
 - [CONTRIBUTING.md](CONTRIBUTING.md) — commit and changelog conventions
 
