@@ -27,22 +27,41 @@ func loadFixturesFromEmbed() ([]domain.Vulnerability, error) {
 	return append(cveVulns, osvVulns...), nil
 }
 
-// loadVulnerabilities returns vulnerability records from the store when
-// available and non-empty, falling back to the embedded fixtures otherwise.
-//
-// This is the single switch that determines whether detect operates on
-// live-synced data or the built-in sample set.
 func loadVulnerabilities(opts Options) ([]domain.Vulnerability, error) {
-	if opts.Store != nil {
-		vulns, err := opts.Store.ListVulnerabilities()
-		if err != nil {
-			return nil, fmt.Errorf("engine: list from store: %w", err)
-		}
-		if len(vulns) > 0 {
-			return vulns, nil
-		}
+	fixtures, err := loadFixturesFromEmbed()
+	if err != nil {
+		return nil, err
 	}
-	return loadFixturesFromEmbed()
+
+	if opts.Store == nil {
+		return fixtures, nil
+	}
+
+	stored, err := opts.Store.ListVulnerabilities()
+	if err != nil {
+		return fixtures, nil
+	}
+
+	seen := make(map[string]bool)
+	var merged []domain.Vulnerability
+
+	for _, v := range stored {
+		key := v.Source + "\x00" + v.ID
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		merged = append(merged, v)
+	}
+	for _, v := range fixtures {
+		key := v.Source + "\x00" + v.ID
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		merged = append(merged, v)
+	}
+	return merged, nil
 }
 
 func loadFixturesFS(fsys fs.FS, dir string) ([]domain.Vulnerability, error) {
@@ -69,6 +88,7 @@ func loadFixturesFS(fsys fs.FS, dir string) ([]domain.Vulnerability, error) {
 	}
 	return out, nil
 }
+
 func EmbeddedFixtureCount() int {
 	v, err := loadFixturesFromEmbed()
 	if err != nil {

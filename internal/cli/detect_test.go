@@ -111,3 +111,18 @@ func TestDetectPURLNotRejected(t *testing.T) {
 		t.Fatalf("detect --purl should not error, got: %v", err)
 	}
 }
+
+func TestParseDetectArgsDBSet(t *testing.T) {
+	got, err := parseDetectArgs([]string{
+		"--product", "Apache", "--version", "2.4.49", "--db", "",
+	})
+	if err != nil {
+		t.Fatalf("parseDetectArgs: %v", err)
+	}
+	if !got.DBSet {
+		t.Fatal("DBSet should be true when --db given")
+	}
+	if got.DB != "" {
+		t.Fatalf("DB should be empty, got %q", got.DB)
+	}
+}

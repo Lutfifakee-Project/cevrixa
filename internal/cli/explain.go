@@ -20,6 +20,7 @@ type explainFlags struct {
 	PURL    string
 	Output  string
 	DB      string
+	DBSet   bool
 	Verbose bool
 	Quiet   bool
 }
@@ -47,7 +48,7 @@ func runExplain(args []string) error {
 	}
 	target.ResolvedCPE = res.CPE
 
-	dbPath := resolveDBPath(flags.DB)
+	dbPath := resolveDBPath(flags.DB, flags.DBSet)
 
 	opts := engine.Options{}
 	if s, err := openStoreIfDB(dbPath); err != nil {
@@ -143,6 +144,7 @@ func parseExplainArgs(args []string) (explainFlags, error) {
 			f.Output = value
 		case "--db":
 			f.DB = value
+			f.DBSet = true
 		default:
 			return f, fmt.Errorf("explain: unknown flag %q", key)
 		}
@@ -191,7 +193,7 @@ Flags:
   --version <ver>      Product version
   --cpe <cpe>          CPE 2.3 identifier
   --purl <purl>        Package URL
-  --db <path>          Read from SQLite database (default: embedded)
+  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
   --verbose            Show full reasoning steps
   --quiet              Print only ID + decision
   --output <fmt>       Output format: human (default) or json

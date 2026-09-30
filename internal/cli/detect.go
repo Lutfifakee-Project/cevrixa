@@ -21,6 +21,7 @@ type detectFlags struct {
 	WithKEV bool
 	FailOn  string
 	DB      string
+	DBSet   bool
 	Verbose bool
 	Quiet   bool
 }
@@ -41,7 +42,7 @@ func runDetect(args []string) error {
 		PURL:    flags.PURL,
 	}
 
-	dbPath := resolveDBPath(flags.DB)
+	dbPath := resolveDBPath(flags.DB, flags.DBSet)
 
 	opts := engine.Options{}
 	if flags.WithKEV {
@@ -54,13 +55,6 @@ func runDetect(args []string) error {
 	}
 
 	if s, err := openStoreIfDB(dbPath); err != nil {
-		return fmt.Errorf("detect: %w", err)
-	} else if s != nil {
-		defer s.Close()
-		opts.Store = s
-	}
-
-	if s, err := openStoreIfDB(flags.DB); err != nil {
 		return fmt.Errorf("detect: %w", err)
 	} else if s != nil {
 		defer s.Close()
@@ -149,6 +143,7 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 			f.FailOn = value
 		case "--db":
 			f.DB = value
+			f.DBSet = true
 		default:
 			return f, fmt.Errorf("detect: unknown flag %q", key)
 		}
@@ -212,7 +207,7 @@ Flags:
   --cpe <cpe>          CPE 2.3 identifier
   --purl <purl>        Package URL (e.g. pkg:pypi/django@4.2.0)
   --with-kev           Enrich findings with CISA KEV data
-  --db <path>          Read from SQLite database (KEV + CVE)
+  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
   --fail-on <level>    Exit non-zero if any finding matches: any, affected, kev
   --verbose            Show full reasoning steps
   --quiet              Print only CVE-ID + status per finding

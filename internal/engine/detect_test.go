@@ -189,11 +189,15 @@ func TestDetectFromStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Detect: %v", err)
 	}
-	if len(report.Findings) != 1 {
-		t.Fatalf("expected 1 finding from store, got %d", len(report.Findings))
+
+	var foundStore bool
+	for _, f := range report.Findings {
+		if f.VulnerabilityID == "CVE-STORE-001" {
+			foundStore = true
+		}
 	}
-	if report.Findings[0].VulnerabilityID != "CVE-STORE-001" {
-		t.Fatalf("VulnerabilityID = %q", report.Findings[0].VulnerabilityID)
+	if !foundStore {
+		t.Fatalf("expected CVE-STORE-001 in findings, got %+v", report.Findings)
 	}
 }
 
@@ -214,6 +218,7 @@ func TestDetectFallbackToEmbeddedWhenStoreEmpty(t *testing.T) {
 		t.Fatalf("expected embedded fallback findings, got %d", len(report.Findings))
 	}
 }
+
 func TestDetectAttachesEnrichment(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 	s, err := store.Open(dbPath)
@@ -245,7 +250,7 @@ func TestDetectAttachesEnrichment(t *testing.T) {
 	}
 
 	if err := s.SaveEnrichment(domain.Enrichment{
-		Source:          "dbcve",
+		Source:          "test",
 		VulnerabilityID: "CVE-ENRICH-001",
 		Mitigation:      "upgrade now",
 	}); err != nil {
@@ -257,13 +262,38 @@ func TestDetectAttachesEnrichment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Detect: %v", err)
 	}
-	if len(report.Findings) != 1 {
-		t.Fatalf("expected 1 finding, got %d", len(report.Findings))
+
+	var found bool
+	for _, f := range report.Findings {
+		if f.VulnerabilityID == "CVE-ENRICH-001" {
+			if f.Enrichment == nil {
+				t.Fatal("Enrichment should be attached to CVE-ENRICH-001")
+			}
+			if f.Enrichment.Mitigation != "upgrade now" {
+				t.Fatalf("Mitigation = %q", f.Enrichment.Mitigation)
+			}
+			found = true
+		}
 	}
-	if report.Findings[0].Enrichment == nil {
-		t.Fatal("Enrichment should be attached")
+	if !found {
+		t.Fatalf("expected CVE-ENRICH-001 in findings, got %+v", report.Findings)
 	}
-	if report.Findings[0].Enrichment.Mitigation != "upgrade now" {
-		t.Fatalf("Mitigation = %q", report.Findings[0].Enrichment.Mitigation)
+}
+
+func TestDetectRiskCopied(t *testing.T) {
+	target := domain.Target{Product: "Apache HTTP Server", Version: "2.4.49"}
+	report, err := Detect(target, Options{})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	if len(report.Findings) < 1 {
+		t.Fatal("expected at least 1 finding")
+	}
+	f := report.Findings[0]
+	if f.Risk == nil {
+		t.Fatal("Risk should be copied from vulnerability")
+	}
+	if f.Risk.Severity == "" || f.Risk.CVSS == 0 {
+		t.Fatalf("Risk incomplete: %+v", f.Risk)
 	}
 }

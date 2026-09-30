@@ -11,6 +11,7 @@ func buildFinding(targetCPE domain.CPE, v domain.Vulnerability, mr matcher.Resul
 		VulnerabilityID: v.ID,
 		Status:          domain.FindingStatusAffected,
 		Confidence:      computeConfidence(mr),
+		Risk:            v.Risk,
 		Applicability: domain.Applicability{
 			Matched:   mr.Matched,
 			Range:     mr.Range,
@@ -38,6 +39,7 @@ func buildPackageFinding(purl domain.PURL, v domain.Vulnerability, pr PackageMat
 		VulnerabilityID: v.ID,
 		Status:          domain.FindingStatusAffected,
 		Confidence:      ConfidenceFromMode(pr.Mode),
+		Risk:            v.Risk,
 		Applicability: domain.Applicability{
 			Matched:   pr.Matched,
 			Range:     pr.Range,

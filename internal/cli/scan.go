@@ -20,6 +20,7 @@ type scanFlags struct {
 	WithKEV bool
 	FailOn  string
 	DB      string
+	DBSet   bool
 }
 
 func runScan(args []string) error {
@@ -36,7 +37,7 @@ func runScan(args []string) error {
 		return fmt.Errorf("scan: %w", err)
 	}
 
-	dbPath := resolveDBPath(flags.DB)
+	dbPath := resolveDBPath(flags.DB, flags.DBSet)
 
 	opts := engine.Options{}
 	if flags.WithKEV {
@@ -49,12 +50,6 @@ func runScan(args []string) error {
 	}
 
 	if s, err := openStoreIfDB(dbPath); err != nil {
-		return fmt.Errorf("scan: %w", err)
-	} else if s != nil {
-		defer s.Close()
-		opts.Store = s
-	}
-	if s, err := openStoreIfDB(flags.DB); err != nil {
 		return fmt.Errorf("scan: %w", err)
 	} else if s != nil {
 		defer s.Close()
@@ -138,6 +133,7 @@ func parseScanArgs(args []string) (scanFlags, error) {
 			f.FailOn = value
 		case "--db":
 			f.DB = value
+			f.DBSet = true
 		default:
 			return f, fmt.Errorf("scan: unknown flag %q", key)
 		}
@@ -172,13 +168,11 @@ func readTargets(input string) ([]domain.Target, error) {
 		return nil, errors.New("empty input")
 	}
 
-	// Try JSON array first.
 	var arr []domain.Target
 	if err := json.Unmarshal(raw, &arr); err == nil {
 		return arr, nil
 	}
 
-	// Fall back to JSONL (one object per line).
 	var targets []domain.Target
 	scanner := bufio.NewScanner(bytes.NewReader(raw))
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -212,7 +206,7 @@ Arguments:
 
 Flags:
   --with-kev           Enrich findings with CISA KEV data
-  --db <path>          Read KEV from SQLite database (default: embedded)
+  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
   --fail-on <level>    Exit non-zero if any finding matches: any, affected, kev
   --output <fmt>       Output format: human (default), json, jsonl, or sarif
   -h, --help           Show this help

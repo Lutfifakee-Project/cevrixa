@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
@@ -49,6 +50,18 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 		fmt.Fprintln(w)
 		fmt.Fprintf(w, "%s\n", f.VulnerabilityID)
 		fmt.Fprintf(w, "  Status     : %s\n", strings.ToUpper(string(f.Status)))
+		if f.Risk != nil {
+			if f.Risk.Severity != "" {
+				fmt.Fprintf(w, "  Severity   : %s\n", f.Risk.Severity)
+			}
+			if f.Risk.CVSS != 0 {
+				v := ""
+				if f.Risk.CVSSVersion != "" {
+					v = " (v" + f.Risk.CVSSVersion + ")"
+				}
+				fmt.Fprintf(w, "  CVSS       : %s%s\n", formatFloat(f.Risk.CVSS), v)
+			}
+		}
 		fmt.Fprintf(w, "  Confidence : %s\n", strings.ToUpper(string(f.Confidence)))
 		if f.Applicability.Range != "" {
 			fmt.Fprintf(w, "  Matched    : %s\n", f.Applicability.Range)
@@ -85,6 +98,7 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 		}
 		fmt.Fprintf(w, "  Evidence   : %d\n", len(f.Evidence))
 	}
+
 	printAttributionFooter(w, r.Findings)
 	return nil
 }
@@ -97,6 +111,7 @@ func renderHumanQuiet(w io.Writer, r domain.Report) error {
 	}
 	return nil
 }
+
 func printAttributionFooter(w io.Writer, findings []domain.Finding) {
 	attr := ""
 	for _, f := range findings {
@@ -124,4 +139,8 @@ func enrichmentAttribution(e *domain.Enrichment) string {
 		return s
 	}
 	return ""
+}
+
+func formatFloat(f float64) string {
+	return strconv.FormatFloat(f, 'f', 1, 64)
 }

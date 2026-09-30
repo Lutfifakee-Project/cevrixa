@@ -39,6 +39,7 @@ type Finding struct {
 	VulnerabilityID string            `json:"vulnerability_id"`
 	Status          FindingStatus     `json:"status"`
 	Confidence      FindingConfidence `json:"confidence"`
+	Risk            *Risk             `json:"risk,omitempty"`
 	Applicability   Applicability     `json:"applicability"`
 	Why             Why               `json:"why"`
 	FixedVersions   []string          `json:"fixed_versions,omitempty"`

@@ -10,14 +10,6 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/store"
 )
 
-// loadKEV resolves the KEV catalog from either a database file (if dbPath
-// is non-empty) or the embedded fixture. It returns the entries and a
-// short label describing the source.
-//
-// Precedence:
-//  1. If withKEV is false → returns nil (KEV disabled).
-//  2. If dbPath is set and the file exists → read from SQLite.
-//  3. Otherwise → read embedded.
 func loadKEV(withKEV bool, dbPath string) (map[string]domain.KEVInfo, string, error) {
 	if !withKEV {
 		return nil, "", nil
@@ -49,13 +41,6 @@ func loadKEV(withKEV bool, dbPath string) (map[string]domain.KEVInfo, string, er
 	return cat.Entries, "embedded", nil
 }
 
-func defaultKEVDBPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".cevrixa", "cevrixa.db")
-}
 func openStoreIfDB(dbPath string) (*store.Store, error) {
 	if dbPath == "" {
 		return nil, nil
@@ -73,8 +58,8 @@ func openStoreIfDB(dbPath string) (*store.Store, error) {
 	return s, nil
 }
 
-func resolveDBPath(requested string) string {
-	if requested != "" {
+func resolveDBPath(requested string, wasSet bool) string {
+	if wasSet {
 		return requested
 	}
 	p, err := defaultDBPath()
@@ -85,4 +70,12 @@ func resolveDBPath(requested string) string {
 		return ""
 	}
 	return p
+}
+
+func defaultKEVDBPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".cevrixa", "cevrixa.db")
 }

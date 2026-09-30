@@ -17,6 +17,7 @@ type sbomFlags struct {
 	WithKEV bool
 	FailOn  string
 	DB      string
+	DBSet   bool
 }
 
 func runSBOM(args []string) error {
@@ -33,7 +34,7 @@ func runSBOM(args []string) error {
 		return fmt.Errorf("sbom: %w", err)
 	}
 
-	dbPath := resolveDBPath(flags.DB)
+	dbPath := resolveDBPath(flags.DB, flags.DBSet)
 
 	opts := engine.Options{}
 	if flags.WithKEV {
@@ -46,12 +47,6 @@ func runSBOM(args []string) error {
 	}
 
 	if s, err := openStoreIfDB(dbPath); err != nil {
-		return fmt.Errorf("sbom: %w", err)
-	} else if s != nil {
-		defer s.Close()
-		opts.Store = s
-	}
-	if s, err := openStoreIfDB(flags.DB); err != nil {
 		return fmt.Errorf("sbom: %w", err)
 	} else if s != nil {
 		defer s.Close()
@@ -135,6 +130,7 @@ func parseSBOMArgs(args []string) (sbomFlags, error) {
 			f.FailOn = value
 		case "--db":
 			f.DB = value
+			f.DBSet = true
 		default:
 			return f, fmt.Errorf("sbom: unknown flag %q", key)
 		}
@@ -159,7 +155,7 @@ Arguments:
 
 Flags:
   --with-kev           Enrich findings with CISA KEV data
-  --db <path>          Read KEV from SQLite database (default: embedded)
+  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
   --fail-on <level>    Exit non-zero if any finding matches: any, affected, kev
   --output <fmt>       Output format: human (default), json, jsonl, or sarif
   -h, --help           Show this help
