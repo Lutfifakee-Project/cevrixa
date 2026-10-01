@@ -57,6 +57,20 @@ func runDoctor(args []string) error {
 			fmt.Printf("       vulnerabilities=%d kev=%d\n", v, k)
 			if v == 0 {
 				warn("Store is empty — run 'cevrixa sync nvd --days 30'")
+			} else if cov, err := s.ApplicabilityCoverage(); err == nil {
+				// A record count says nothing about whether the records can be
+				// matched. Report the gap instead of implying the store is healthy.
+				switch {
+				case cov.Unmatchable == 0:
+					pass(fmt.Sprintf("Store applicability: all %d records carry matchable criteria", cov.Total))
+				default:
+					warn(fmt.Sprintf(
+						"Store applicability: %d of %d records carry no matchable criteria (%d with CPE, %d package-only)",
+						cov.Unmatchable, cov.Total, cov.WithCPE, cov.WithPackage,
+					))
+					fmt.Printf("       Those records cannot match any target. Re-sync to repair:\n")
+					fmt.Printf("       cevrixa sync nvd --days 120   (or --full)\n")
+				}
 			}
 		} else {
 			warn(fmt.Sprintf("Store not present at %s — run 'cevrixa sync kev'", dbPath))

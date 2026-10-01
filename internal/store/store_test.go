@@ -182,6 +182,72 @@ func TestDeleteAllKEV(t *testing.T) {
 	}
 }
 
+func TestApplicabilityCoverage(t *testing.T) {
+	s := openTestStore(t)
+
+	// A CPE record: matchable through criteria.
+	if err := s.SaveVulnerability(domain.Vulnerability{
+		ID:     "CVE-CPE-1",
+		Source: "nvd",
+		Applicability: []domain.ApplicabilityNode{
+			{Matches: []domain.CPEMatch{
+				{Vulnerable: true, Criteria: "cpe:2.3:a:apache:http_server:*:*:*:*:*:*:*:*"},
+			}},
+		},
+	}); err != nil {
+		t.Fatalf("save cpe record: %v", err)
+	}
+
+	// A package record: matchable through ranges.
+	if err := s.SaveVulnerability(domain.Vulnerability{
+		ID:     "GHSA-pkg-1",
+		Source: "osv",
+		PackageApplicability: []domain.PackageApplicability{
+			{Name: "django", Ecosystem: "PyPI", Ranges: []domain.PackageRange{
+				{Type: "ECOSYSTEM", Events: []domain.PackageRangeEvent{{Introduced: "0"}, {Fixed: "4.2.10"}}},
+			}},
+		},
+	}); err != nil {
+		t.Fatalf("save package record: %v", err)
+	}
+
+	// A record with no applicability at all: cannot match anything. This is the
+	// shape left behind when applicability data is discarded while storing.
+	if err := s.SaveVulnerability(domain.Vulnerability{ID: "CVE-STALE-1", Source: "nvd"}); err != nil {
+		t.Fatalf("save stale record: %v", err)
+	}
+
+	got, err := s.ApplicabilityCoverage()
+	if err != nil {
+		t.Fatalf("ApplicabilityCoverage: %v", err)
+	}
+
+	if got.Total != 3 {
+		t.Fatalf("Total = %d, want 3", got.Total)
+	}
+	if got.WithCPE != 1 {
+		t.Fatalf("WithCPE = %d, want 1", got.WithCPE)
+	}
+	if got.WithPackage != 1 {
+		t.Fatalf("WithPackage = %d, want 1", got.WithPackage)
+	}
+	if got.Unmatchable != 1 {
+		t.Fatalf("Unmatchable = %d, want 1", got.Unmatchable)
+	}
+}
+
+func TestApplicabilityCoverageEmptyStore(t *testing.T) {
+	s := openTestStore(t)
+
+	got, err := s.ApplicabilityCoverage()
+	if err != nil {
+		t.Fatalf("ApplicabilityCoverage: %v", err)
+	}
+	if got.Total != 0 || got.Unmatchable != 0 {
+		t.Fatalf("empty store should report zeroes, got %+v", got)
+	}
+}
+
 func TestMigrationIdempotent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "test.db")
 

@@ -27,6 +27,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Fixed `scan` and `sbom` accepting an unrecognised `--fail-on` gate, which
   disabled the check and exited successfully on a vulnerable target. Every
   command that accepts the flag now validates it against the same set of gates.
+- Added a store applicability check to `doctor`. A record count alone implied a
+  healthy store even when most records carried no criteria and could not match
+  any target. `doctor` now measures how many stored records carry matchable
+  criteria and warns with the re-sync command when some do not.
 
 ## [v0.2.2] — 2026-09-30
 
