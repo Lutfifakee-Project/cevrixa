@@ -11,7 +11,11 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -23,14 +27,7 @@ jobs:
           cache: true
 
       - name: Check formatting
-        shell: bash
-        run: |
-          files="$(gofmt -l .)"
-          if [[ -n "$files" ]]; then
-            echo "The following files are not gofmt-clean:"
-            echo "$files"
-            exit 1
-          fi
+        run: go run scripts/fmtcheck.go
 
       - name: Vet
         run: go vet ./...
@@ -38,5 +35,27 @@ jobs:
       - name: Test
         run: go test ./... -race -count=1
 
-      - name: Build
-        run: go build ./...
+  cross-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Cross-compile all supported platforms
+        env:
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: go run scripts/build.go --all --out dist
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: cevrixa-binaries
+          path: dist/*
+          if-no-files-found: error

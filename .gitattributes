@@ -1,0 +1,8 @@
+* text=auto eol=lf
+
+# Go sources always LF
+*.go text eol=lf
+
+# Keep binary artifacts untouched
+*.exe binary
+*.db binary

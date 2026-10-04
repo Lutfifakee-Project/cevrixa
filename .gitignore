@@ -1,9 +1,19 @@
 # Build output
 /bin/
 
-# Internal design notes. Kept local on purpose: these describe how Cevrixa is
-# planned and built, and are not part of the published repository.
+# Internal design notes and concept documents. Kept local on purpose: they
+describe how Cevrixa is planned and built, and are not part of the published
+repository.
 /docs/
+/ENGINEERING_SPEC.md
+/ROADMAP.md
+/Alur.txt
+
+# Agent working notes
+/Codelyxa/
+
+# Scratch input
+/targets.txt
 
 # Coverage
 /coverage.out
@@ -16,6 +26,7 @@
 # OS metadata
 .DS_Store
 Thumbs.db
+*:Zone.Identifier
 
 # Temporary files
 *.tmp
