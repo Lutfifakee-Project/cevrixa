@@ -1,5 +1,7 @@
 # Cevrixa
 
+<img src="assets/banner.png" alt="Cevrixa" width="600">
+
 > Vulnerability intelligence and detection engine for software packages, CPEs, PURLs, and vulnerability data.
 
 [![Status](https://img.shields.io/badge/status-development-orange.svg)](CHANGELOG.md)
@@ -133,6 +135,28 @@ make build
 ```
 
 The binary is written to `bin/cevrixa`.
+
+### Supported platforms
+
+Cevrixa ships prebuilt binaries for:
+
+| OS | Architectures |
+|---|---|
+| Linux | `amd64`, `arm64` |
+| macOS | `amd64`, `arm64` |
+| Windows | `amd64`, `arm64` |
+
+Cross-compile every target from any OS (no Unix shell required):
+
+```bash
+make build-all   # binaries land in bin/
+```
+
+Or build a specific platform directly:
+
+```bash
+go run scripts/build.go --os linux --arch arm64 --out bin
+```
 
 Fetch vulnerability data into the local database before detecting:
 

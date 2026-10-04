@@ -18,12 +18,29 @@ Categories:
 - **Removed** — capability taken away
 - **Breaking** — requires action from the user
 
-Versions follow [Semantic Versioning](https://semver.org/).
+Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.2.3] — 2026-10-05
+
+Portability and reliability release. Cevrixa now builds for Linux, macOS, and
+Windows (amd64 and arm64) from any host, ships a release workflow, and fixes a
+set of defects found by auditing the whole tree.
+
 ### Security
 
+- Fixed an undecidable CPE configuration being silently dropped from `detect`
+  and `scan`. A finding whose applicability could not be decided (an `AND`
+  group that needs a component other than the target, a negated node, or a
+  version range that cannot be compared) has `matched` false, and was
+  discarded before it reached the report. The core promise — a question
+  Cevrixa cannot answer is `inconclusive`, never `not_affected` — now holds on
+  the CPE path, not only the package path.
+- Fixed severity `--fail-on` gates firing on findings the target is not
+  affected by. A `not_affected` or `inconclusive` finding still carries the
+  vulnerability's severity for context, and `--fail-on high` treated that as a
+  build failure. Severity gates now apply only to `affected` findings.
 - Fixed `scan` and `sbom` accepting an unrecognised `--fail-on` gate, which
   disabled the check and exited successfully on a vulnerable target. Every
   command that accepts the flag now validates it against the same set of gates.
@@ -31,6 +48,56 @@ Versions follow [Semantic Versioning](https://semver.org/).
   healthy store even when most records carried no criteria and could not match
   any target. `doctor` now measures how many stored records carry matchable
   criteria and warns with the re-sync command when some do not.
+
+### Detection
+
+- Fixed the CycloneDX reader ignoring `metadata.component` and nested
+  `components`. Real SBOMs nest dependencies, and those components were
+  silently skipped. The reader now walks the tree and deduplicates by PURL.
+- Improved OSV range parsing to keep a `fixed` or `last_affected` event that
+  appears before any `introduced` event, instead of dropping it.
+
+### Database
+
+- Fixed OSV sync stopping after the first page. The client already returned a
+  pagination token, but the sync ignored it, so a package with many advisories
+  was stored only in part. `sync osv` now follows the token to completion and
+  records sync metadata.
+- Fixed NVD backfill using a hardcoded end date. `backfill` now starts from the
+  current time, so it keeps covering the present as time passes.
+
+### Fixed
+
+- Fixed `embed.FS` reads failing on Windows. Fixture paths were built with
+  `filepath.Join`, which produces backslashes on Windows, but `embed.FS`
+  always uses forward slashes. Every fixture-backed test in `internal/engine`
+  failed on Windows.
+- Fixed the config loader ignoring `HOME` on Windows. `os.UserHomeDir` reads
+  `USERPROFILE` there, so a redirected `HOME` had no effect and tests read the
+  real machine config. The loader now prefers `HOME`, then falls back.
+- Fixed SARIF output serialising an empty report as `"results": null` and
+  `"rules": null`. The SARIF schema expects arrays, so an empty run now emits
+  `[]`.
+
+### Improved
+
+- Added retry with exponential backoff to the NVD, OSV, and KEV HTTP clients,
+  capped at a per-client maximum, so a transient 429 or 5xx no longer fails a
+  sync outright.
+- Improved correlation grouping with union by rank, keeping the identifier
+  trees shallow for large datasets.
+
+### Added
+
+- Added cross-platform builds. `scripts/build.go` compiles every supported
+  target from any host without a Unix shell, and `make build-all` runs it.
+- Added `scripts/fmtcheck.go`, a portable `gofmt` check that does not rely on a
+  Unix shell, used by `make check` and CI.
+- Added an OS matrix to CI (Ubuntu, Windows, macOS) that runs `vet` and the
+  test suite on each, plus a cross-build job that produces all six binaries.
+- Added `.github/workflows/release.yml`. Pushing a `v*` tag builds every
+  platform, writes a `checksums.txt`, and publishes a GitHub Release.
+- Documented the supported platforms in the README.
 
 ## [v0.2.2] — 2026-09-30
 
