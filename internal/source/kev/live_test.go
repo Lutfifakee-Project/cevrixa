@@ -25,6 +25,7 @@ func TestFetchLiveFromMock(t *testing.T) {
 }
 
 func TestFetchLiveFromHTTPError(t *testing.T) {
+	DisableRetry()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))

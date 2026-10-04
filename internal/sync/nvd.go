@@ -155,10 +155,9 @@ func BackfillNVD(ctx context.Context, opts NVDBackfillOptions) (int, error) {
 
 	const layout = "2006-01-02T15:04:05.000"
 
-	end, err := time.Parse(layout, "2026-12-31T00:00:00.000")
-	if err != nil {
-		return 0, fmt.Errorf("parse default end: %w", err)
-	}
+	// Start from now so the backfill window keeps including new data as time
+	// passes; a hardcoded end date would silently stop covering the present.
+	end := time.Now().UTC()
 	earliest, err := time.Parse(layout, opts.EarliestISO)
 	if err != nil {
 		return 0, fmt.Errorf("parse earliest: %w", err)

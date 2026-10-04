@@ -255,10 +255,17 @@ func TestDetectAndRequirementDoesNotProduceFinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Detect: %v", err)
 	}
-	for _, f := range report.Findings {
-		if f.VulnerabilityID == "CVE-AND-001" {
-			t.Fatalf("AND requirement must not be reported as affected: %+v", f)
+	var found *domain.Finding
+	for i := range report.Findings {
+		if report.Findings[i].VulnerabilityID == "CVE-AND-001" {
+			found = &report.Findings[i]
 		}
+	}
+	if found == nil {
+		t.Fatal("AND requirement must still be reported as inconclusive, not dropped")
+	}
+	if found.Status != domain.FindingStatusInconclusive {
+		t.Fatalf("AND requirement status = %q, want inconclusive", found.Status)
 	}
 }
 

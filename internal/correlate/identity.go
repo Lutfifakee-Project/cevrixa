@@ -17,6 +17,7 @@ func groupByIdentity(vulns []domain.Vulnerability) []identityGroup {
 	}
 
 	parent := make([]int, len(vulns))
+	rank := make([]int, len(vulns))
 	for i := range parent {
 		parent[i] = i
 	}
@@ -28,10 +29,19 @@ func groupByIdentity(vulns []domain.Vulnerability) []identityGroup {
 		}
 		return parent[i]
 	}
+	// Union by rank keeps the trees shallow, so grouping stays near-linear
+	// even when many records share identifiers.
 	union := func(a, b int) {
 		ra, rb := find(a), find(b)
-		if ra != rb {
-			parent[ra] = rb
+		if ra == rb {
+			return
+		}
+		if rank[ra] < rank[rb] {
+			ra, rb = rb, ra
+		}
+		parent[rb] = ra
+		if rank[ra] == rank[rb] {
+			rank[ra]++
 		}
 	}
 

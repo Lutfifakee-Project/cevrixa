@@ -117,6 +117,12 @@ func (f Finding) IsSeverityAtLeast(threshold string) bool {
 		if !ok {
 			return false
 		}
+		// A severity gate only applies to findings the target is actually
+		// affected by. A not_affected or inconclusive finding carries the
+		// vulnerability's severity for context, but must not fail a build.
+		if f.Status != FindingStatusAffected {
+			return false
+		}
 		have, ok := severityRank[CanonicalSeverity(f.severity())]
 		if !ok {
 			return false

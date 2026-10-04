@@ -15,6 +15,12 @@ import (
 
 const DefaultBaseURL = "https://api.osv.dev/v1/query"
 
+const (
+	maxRetries        = 4
+	initialRetryDelay = 2 * time.Second
+	maxRetryDelay     = 30 * time.Second
+)
+
 type Client struct {
 	HTTPClient *http.Client
 	BaseURL    string
@@ -82,6 +88,46 @@ func (c *Client) List(ctx context.Context, query source.Query) (source.Result, e
 		return source.Result{}, fmt.Errorf("osv: encode request: %w", err)
 	}
 
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-time.After(backoffDelay(attempt)):
+			case <-ctx.Done():
+				return source.Result{}, ctx.Err()
+			}
+		}
+
+		res, err := c.doQuery(ctx, base, body)
+		if err != nil {
+			lastErr = err
+			if isRetryable(err) {
+				continue
+			}
+			return source.Result{}, err
+		}
+		return res, nil
+	}
+	return source.Result{}, fmt.Errorf("osv: exhausted retries: %w", lastErr)
+}
+
+// backoffDelay returns the delay before the given retry attempt (1-based),
+// growing exponentially and capped at maxRetryDelay.
+func backoffDelay(attempt int) time.Duration {
+	d := initialRetryDelay
+	for i := 1; i < attempt; i++ {
+		d *= 2
+		if d >= maxRetryDelay {
+			return maxRetryDelay
+		}
+	}
+	if d > maxRetryDelay {
+		d = maxRetryDelay
+	}
+	return d
+}
+
+func (c *Client) doQuery(ctx context.Context, base string, body []byte) (source.Result, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base, strings.NewReader(string(body)))
 	if err != nil {
 		return source.Result{}, fmt.Errorf("osv: create request: %w", err)
@@ -95,6 +141,9 @@ func (c *Client) List(ctx context.Context, query source.Query) (source.Result, e
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= http.StatusInternalServerError {
+		return source.Result{}, &retryableError{status: resp.StatusCode}
+	}
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		return source.Result{}, fmt.Errorf("osv: HTTP %d: %s", resp.StatusCode, string(raw))
@@ -116,4 +165,17 @@ func (c *Client) List(ctx context.Context, query source.Query) (source.Result, e
 		NextPageToken:   payloadResp.NextPageToken,
 		ResultsPerPage:  len(records),
 	}, nil
+}
+
+type retryableError struct {
+	status int
+}
+
+func (e *retryableError) Error() string {
+	return fmt.Sprintf("osv: retryable status %d", e.status)
+}
+
+func isRetryable(err error) bool {
+	_, ok := err.(*retryableError)
+	return ok
 }

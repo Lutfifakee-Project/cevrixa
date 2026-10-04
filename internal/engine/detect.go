@@ -54,7 +54,7 @@ func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 		if err != nil {
 			continue
 		}
-		if !mr.Matched {
+		if !mr.Matched && !mr.Undecided {
 			continue
 		}
 		f := buildFinding(targetCPE, v, mr, enrichmentsFor(opts, v.ID))

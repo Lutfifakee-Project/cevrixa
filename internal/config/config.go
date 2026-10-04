@@ -55,9 +55,16 @@ func Load() (Config, error) {
 }
 
 func defaultPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
+	// Prefer an explicit HOME so the config location can be redirected
+	// portably (tests, containers). On Windows os.UserHomeDir reads
+	// USERPROFILE, so HOME would otherwise be ignored.
+	home := os.Getenv("HOME")
+	if home == "" {
+		var err error
+		home, err = os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
 	}
 	return filepath.Join(home, ".cevrixa", "config.json"), nil
 }

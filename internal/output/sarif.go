@@ -166,8 +166,8 @@ func buildRun(r domain.Report, toolVersion string) sarifRun {
 	}
 
 	seenRules := map[string]bool{}
-	var rules []sarifRule
-	var results []sarifResult
+	rules := make([]sarifRule, 0)
+	results := make([]sarifResult, 0)
 
 	for _, f := range r.Findings {
 		if !seenRules[f.VulnerabilityID] {

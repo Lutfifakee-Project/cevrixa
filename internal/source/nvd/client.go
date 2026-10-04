@@ -19,6 +19,7 @@ const DefaultBaseURL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 const (
 	maxRetries        = 5
 	initialRetryDelay = 10 * time.Second
+	maxRetryDelay     = 60 * time.Second
 )
 
 type Client struct {
@@ -83,10 +84,8 @@ func (c *Client) List(ctx context.Context, query source.Query) (source.Result, e
 	var lastErr error
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		if attempt > 0 {
-			delay := initialRetryDelay * time.Duration(attempt)
-			fmt.Fprintf(io.Discard, "") // no-op to keep format stable
 			select {
-			case <-time.After(delay):
+			case <-time.After(backoffDelay(attempt)):
 			case <-ctx.Done():
 				return source.Result{}, ctx.Err()
 			}
@@ -107,6 +106,23 @@ func (c *Client) List(ctx context.Context, query source.Query) (source.Result, e
 		return res, nil
 	}
 	return source.Result{}, fmt.Errorf("nvd: exhausted retries: %w", lastErr)
+}
+
+// backoffDelay returns the delay before the given retry attempt (1-based).
+// The delay grows exponentially from initialRetryDelay and is capped at
+// maxRetryDelay so a long outage does not push the wait unboundedly high.
+func backoffDelay(attempt int) time.Duration {
+	d := initialRetryDelay
+	for i := 1; i < attempt; i++ {
+		d *= 2
+		if d >= maxRetryDelay {
+			return maxRetryDelay
+		}
+	}
+	if d > maxRetryDelay {
+		d = maxRetryDelay
+	}
+	return d
 }
 
 func (c *Client) doRequest(ctx context.Context, urlStr string) (source.Result, error) {

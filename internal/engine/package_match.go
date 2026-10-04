@@ -135,13 +135,21 @@ func buildSegments(events []domain.PackageRangeEvent) []osvSegment {
 			}
 			cur = &osvSegment{introduced: ev.Introduced}
 		}
-		if cur != nil {
-			if ev.Fixed != "" {
-				cur.fixed = ev.Fixed
+		if cur == nil {
+			// Defensive: an OSV range normally opens with "introduced", but a
+			// fixed/last_affected event that appears first still describes a
+			// real interval. Treat it as introduced from the beginning ("0")
+			// so the range is evaluated instead of being silently dropped.
+			if ev.Fixed == "" && ev.LastAffected == "" {
+				continue
 			}
-			if ev.LastAffected != "" {
-				cur.lastAffected = ev.LastAffected
-			}
+			cur = &osvSegment{introduced: "0"}
+		}
+		if ev.Fixed != "" {
+			cur.fixed = ev.Fixed
+		}
+		if ev.LastAffected != "" {
+			cur.lastAffected = ev.LastAffected
 		}
 	}
 	if cur != nil {

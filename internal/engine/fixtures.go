@@ -5,15 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
-	"path/filepath"
+	"path"
 	"sort"
 	"strings"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 )
 
-//go:embed fixtures/cve/*.json
-//go:embed fixtures/osv/*.json
+//go:embed fixtures/cve
+//go:embed fixtures/osv
 var embeddedFixtures embed.FS
 
 func loadFixturesFromEmbed() ([]domain.Vulnerability, error) {
@@ -98,14 +98,14 @@ func loadFixturesFS(fsys fs.FS, dir string) ([]domain.Vulnerability, error) {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
 			continue
 		}
-		path := filepath.Join(dir, e.Name())
-		raw, err := fs.ReadFile(fsys, path)
+		p := path.Join(dir, e.Name())
+		raw, err := fs.ReadFile(fsys, p)
 		if err != nil {
-			return nil, fmt.Errorf("engine: read %s: %w", path, err)
+			return nil, fmt.Errorf("engine: read %s: %w", p, err)
 		}
 		var v domain.Vulnerability
 		if err := json.Unmarshal(raw, &v); err != nil {
-			return nil, fmt.Errorf("engine: parse %s: %w", path, err)
+			return nil, fmt.Errorf("engine: parse %s: %w", p, err)
 		}
 		out = append(out, v)
 	}
