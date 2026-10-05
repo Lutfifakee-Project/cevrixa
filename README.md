@@ -1,6 +1,6 @@
-# Cevrixa
+![cevrixa](/assets/banner.png)
 
-<img src="assets/banner.png" alt="Cevrixa" width="600">
+# Cevrixa
 
 > Vulnerability intelligence and detection engine for software packages, CPEs, PURLs, and vulnerability data.
 
