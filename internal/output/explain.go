@@ -9,6 +9,17 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/matcher"
 )
 
+// PackageExplain describes a package (PURL) applicability result in the
+// renderer's own terms, so the output package does not need to depend on the
+// engine.
+type PackageExplain struct {
+	Range     string
+	Fixed     string
+	Mode      string
+	Undecided bool
+	Reason    string
+}
+
 type ExplainReport struct {
 	Vulnerability domain.Vulnerability
 	Target        domain.Target
@@ -18,10 +29,24 @@ type ExplainReport struct {
 	Fixed         string
 	Confidence    string
 
+	// Package is set when the target was a PURL and package applicability was
+	// evaluated. Nil means the report is not a package evaluation.
+	Package *PackageExplain
+
+	// Why carries the reasoning built by the caller. When empty the renderer
+	// falls back to matcher.BuildWhy for CPE reports.
+	Why domain.Why
+
+	// Evidence is the correlated evidence set for this vulnerability, including
+	// evidence from other sources. Conflicts lists cross-source disagreements
+	// found while correlating them. Both are optional.
+	Evidence  []domain.Evidence
+	Conflicts []domain.Conflict
+
 	// NotEvaluated reports that applicability was never evaluated for this
-	// target (for example a package target, an unresolved identity, or an
-	// unusable version). The zero value means "was evaluated", so a report that
-	// simply carries a verdict cannot silently become inconclusive.
+	// target (for example an unresolved identity, or an unusable version). The
+	// zero value means "was evaluated", so a report that simply carries a verdict
+	// cannot silently become inconclusive.
 	NotEvaluated bool
 	// NotEvaluatedReason explains why no verdict could be produced.
 	NotEvaluatedReason string
@@ -121,13 +146,36 @@ func RenderExplainHumanWithOptions(w io.Writer, r ExplainReport, opts RenderOpti
 		fmt.Fprintln(w)
 	}
 
+	if r.Package != nil {
+		fmt.Fprintln(w, "    [+] Applicability")
+		fmt.Fprintf(w, "        [*] Source       %s\n", r.Vulnerability.Source)
+		if r.Package.Range != "" {
+			fmt.Fprintf(w, "        [*] Range        %s\n", r.Package.Range)
+		}
+		result := "NO MATCH"
+		switch {
+		case r.Package.Undecided:
+			result = "UNDECIDED"
+		case r.Applicable:
+			result = "MATCH"
+		}
+		fmt.Fprintf(w, "        [*] Result       %s\n", result)
+		if r.Package.Undecided && r.Package.Reason != "" {
+			fmt.Fprintf(w, "        [!] Reason       %s\n", r.Package.Reason)
+		}
+		fmt.Fprintln(w)
+	}
+
 	if r.Fixed != "" {
 		fmt.Fprintln(w, "    [+] Fixed")
 		fmt.Fprintf(w, "        [*] Version      %s\n", r.Fixed)
 		fmt.Fprintln(w)
 	}
 
-	why := matcher.BuildWhy(r.TargetCPE, r.Match)
+	why := r.Why
+	if len(why.Steps) == 0 && r.Package == nil {
+		why = matcher.BuildWhy(r.TargetCPE, r.Match)
+	}
 	if len(why.Steps) > 0 {
 		fmt.Fprintln(w, "    [+] Why")
 		for _, step := range why.Steps {
@@ -136,15 +184,80 @@ func RenderExplainHumanWithOptions(w io.Writer, r ExplainReport, opts RenderOpti
 		fmt.Fprintln(w)
 	}
 
-	if len(r.Vulnerability.References) > 0 {
+	renderExplainEvidence(w, r)
+
+	return nil
+}
+
+// renderExplainEvidence prints the evidence tree and any cross-source
+// conflicts. Evidence is the first-class reasoning record, so it is shown
+// alongside the references rather than replaced by them.
+func renderExplainEvidence(w io.Writer, r ExplainReport) {
+	if len(r.Evidence) > 0 {
 		fmt.Fprintln(w, "    [+] Evidence")
+		for _, e := range r.Evidence {
+			line := "        [*] " + string(e.Kind)
+			if e.Source != "" {
+				line += " [" + e.Source + "]"
+			}
+			if v := evidenceValue(e); v != "" {
+				line += " " + v
+			}
+			fmt.Fprintln(w, line)
+		}
+		fmt.Fprintln(w)
+	}
+
+	if len(r.Vulnerability.References) > 0 {
+		fmt.Fprintln(w, "    [+] References")
 		for _, ref := range r.Vulnerability.References {
 			fmt.Fprintf(w, "        [*] [%s] %s\n", ref.Source, ref.URL)
 		}
 		fmt.Fprintln(w)
 	}
 
-	return nil
+	if len(r.Conflicts) > 0 {
+		fmt.Fprintln(w, "    [+] Conflicts")
+		for _, c := range r.Conflicts {
+			fmt.Fprintf(w, "        [!] %s\n", c.Kind)
+			for _, v := range c.Values {
+				fmt.Fprintf(w, "            [%s] %s\n", v.Source, v.Value)
+			}
+		}
+		fmt.Fprintln(w)
+	}
+}
+
+// evidenceValue renders the human-readable value of an evidence item.
+func evidenceValue(e domain.Evidence) string {
+	if e.Value != "" {
+		return e.Value
+	}
+	if e.Reference != nil {
+		return e.Reference.URL
+	}
+	if e.Range != nil {
+		return formatEvidenceRange(e.Range)
+	}
+	return ""
+}
+
+func formatEvidenceRange(r *domain.PackageRange) string {
+	if len(r.Events) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(r.Events))
+	for _, ev := range r.Events {
+		switch {
+		case ev.Introduced != "":
+			parts = append(parts, ">="+ev.Introduced)
+		case ev.Fixed != "":
+			parts = append(parts, "<"+ev.Fixed)
+		case ev.LastAffected != "":
+			parts = append(parts, "<="+ev.LastAffected)
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func RenderExplainJSON(w io.Writer, r ExplainReport) error {
@@ -160,18 +273,24 @@ func RenderExplainJSON(w io.Writer, r ExplainReport) error {
 		Applicability   map[string]any     `json:"applicability,omitempty"`
 		Fixed           string             `json:"fixed,omitempty"`
 		References      []domain.Reference `json:"references,omitempty"`
+		Why             domain.Why         `json:"why,omitempty"`
+		Evidence        []domain.Evidence  `json:"evidence,omitempty"`
+		Conflicts       []domain.Conflict  `json:"conflicts,omitempty"`
 	}
 	out := jsonOut{
 		VulnerabilityID: r.Vulnerability.ID,
 		Source:          r.Vulnerability.Source,
 		Summary:         r.Vulnerability.Summary,
 		Decision:        string(r.Decision()),
-		Undecided:       r.Match.Undecided || r.NotEvaluated,
+		Undecided:       r.Match.Undecided || r.NotEvaluated || r.undecidedPackage(),
 		Reason:          r.reason(),
 		Confidence:      r.Confidence,
 		Target:          r.Target,
 		Fixed:           r.Fixed,
 		References:      r.Vulnerability.References,
+		Why:             r.why(),
+		Evidence:        r.Evidence,
+		Conflicts:       r.Conflicts,
 	}
 	if r.Match.Criteria != "" {
 		out.Applicability = map[string]any{
@@ -180,9 +299,30 @@ func RenderExplainJSON(w io.Writer, r ExplainReport) error {
 			"criteria": r.Match.Criteria,
 			"source":   r.Vulnerability.Source,
 		}
+	} else if r.Package != nil {
+		out.Applicability = map[string]any{
+			"matched": r.Applicable,
+			"range":   r.Package.Range,
+			"mode":    r.Package.Mode,
+			"source":  r.Vulnerability.Source,
+		}
 	}
 	enc := newJSONEncoder(w)
 	return enc.Encode(out)
+}
+
+func (r ExplainReport) why() domain.Why {
+	if len(r.Why.Steps) != 0 {
+		return r.Why
+	}
+	if r.Package != nil {
+		return domain.Why{}
+	}
+	return matcher.BuildWhy(r.TargetCPE, r.Match)
+}
+
+func (r ExplainReport) undecidedPackage() bool {
+	return r.Package != nil && r.Package.Undecided
 }
 
 // reason returns the single explanation for a report that could not be decided.
@@ -192,6 +332,9 @@ func (r ExplainReport) reason() string {
 	}
 	if r.Match.Undecided {
 		return r.Match.Reason
+	}
+	if r.Package != nil && r.Package.Undecided {
+		return r.Package.Reason
 	}
 	return ""
 }

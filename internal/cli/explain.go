@@ -60,10 +60,7 @@ func runExplain(args []string) error {
 
 	vuln, err := engine.FindByID(flags.VulnID, opts)
 	if err != nil {
-		return fmt.Errorf(
-			"explain: %w\n  hint: the local dataset does not contain this identifier; run 'cevrixa sync nvd --days 30' or pass --db <path>",
-			err,
-		)
+		return fmt.Errorf("explain: %w (hint: run 'cevrixa sync nvd --days 30' or pass --db <path>)", err)
 	}
 
 	report := output.ExplainReport{
@@ -73,11 +70,7 @@ func runExplain(args []string) error {
 
 	switch {
 	case flags.PURL != "":
-		// Package applicability is evaluated by the package matcher, which
-		// explain does not run yet. Saying so is the honest answer: reporting
-		// NOT AFFECTED here would be a wrong answer, not a missing feature.
-		report.NotEvaluated = true
-		report.NotEvaluatedReason = "package (PURL) applicability is not evaluated by explain yet; run 'cevrixa detect --purl " + flags.PURL + "'"
+		evaluatePURL(&report, target, vuln)
 	case target.ResolvedCPE == "":
 		report.NotEvaluated = true
 		report.NotEvaluatedReason = "target identity could not be resolved to a CPE; pass --cpe or use a product present in the resolver catalog"
@@ -88,8 +81,6 @@ func runExplain(args []string) error {
 		}
 		report.TargetCPE = targetCPE
 
-		// A matcher error means the question could not be answered. Swallowing
-		// it here used to turn an unusable version into "NOT AFFECTED".
 		mr, matchErr := matcher.MatchCPE(targetCPE, vuln)
 		report.Match = mr
 		if matchErr != nil {
@@ -107,6 +98,8 @@ func runExplain(args []string) error {
 		}
 	}
 
+	report.Evidence, report.Conflicts = engine.ExplainEvidence(vuln, opts)
+
 	switch flags.Output {
 	case "", "human":
 		return output.RenderExplainHumanWithOptions(os.Stdout, report, output.RenderOptions{
@@ -117,6 +110,41 @@ func runExplain(args []string) error {
 		return output.RenderExplainJSON(os.Stdout, report)
 	default:
 		return fmt.Errorf("explain: unsupported --output %q", flags.Output)
+	}
+}
+
+// evaluatePURL fills the report from the package matcher. The package matcher
+// is shared with detection, so explain and detect cannot disagree about a
+// package target.
+func evaluatePURL(report *output.ExplainReport, target domain.Target, vuln domain.Vulnerability) {
+	pr, ok, err := engine.EvaluatePURL(target, vuln)
+	if err != nil {
+		report.NotEvaluated = true
+		report.NotEvaluatedReason = err.Error()
+		return
+	}
+	if !ok {
+		report.NotEvaluated = true
+		report.NotEvaluatedReason = "the vulnerability carries no package applicability for this target"
+		return
+	}
+
+	report.Applicable = pr.Matched
+	report.Fixed = pr.Fixed
+	report.Confidence = string(engine.ConfidenceFromMode(pr.Mode))
+	report.Package = &output.PackageExplain{
+		Range:     pr.Range,
+		Fixed:     pr.Fixed,
+		Mode:      pr.Mode,
+		Undecided: pr.Undecided,
+		Reason:    pr.Reason,
+	}
+	if purl, perr := domain.ParsePURL(target.PURL); perr == nil {
+		report.Why = engine.BuildPackageWhy(purl, pr)
+	}
+	if pr.Undecided {
+		report.NotEvaluated = true
+		report.NotEvaluatedReason = pr.Reason
 	}
 }
 
@@ -217,7 +245,7 @@ Flags:
   --product <name>     Product name (requires --version)
   --version <ver>      Product version
   --cpe <cpe>          CPE 2.3 identifier
-  --purl <purl>        Package URL (package applicability is not evaluated yet)
+  --purl <purl>        Package URL (evaluated with the package matcher)
   --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
   --verbose            Show full reasoning steps
   --quiet              Print only ID + decision
@@ -226,6 +254,6 @@ Flags:
 
 Examples:
   cevrixa explain CVE-2021-41773 --product "Apache HTTP Server" --version "2.4.49"
-  cevrixa explain CVE-2021-41773 --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
+  cevrixa explain CVE-2021-41773 --cpe "cpe:2.3:a:apache:http_server:2.4.49:::::::*"
   cevrixa explain CVE-2021-41773 --product "Apache HTTP Server" --version "2.4.49" --quiet`)
 }
