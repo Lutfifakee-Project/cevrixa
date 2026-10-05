@@ -22,6 +22,25 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.9.0] — 2026-10-06
+
+Researcher experience. explain shows more of the record and its reasoning.
+
+### Added
+
+- explain now prints a vulnerability metadata section: source, source record
+  identifier, aliases, published and modified dates, and the summary.
+- explain accepts --trace, recording the reasoning path (resolve identity,
+  load vulnerability, evaluate applicability, collect evidence) in the human
+  output and in JSON, matching detect.
+- explain --verbose now expands the applicability statements behind each
+  evidence item, showing the criteria and version bounds.
+
+### Changed
+
+- explain JSON now carries source_identifier, aliases, published,
+  modified, and trace alongside the decision.
+
 ## [v0.8.0] — 2026-10-06
 
 Integration. Commands read from a frozen snapshot, and detect accepts a target
