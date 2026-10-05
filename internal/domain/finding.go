@@ -50,6 +50,9 @@ type Finding struct {
 	Conflicts       []Conflict        `json:"conflicts,omitempty"`
 	KnownExploited  *KEVInfo          `json:"known_exploited,omitempty"`
 	Enrichment      *Enrichment       `json:"enrichment,omitempty"`
+	// Priority ranks urgency. It is set only for affected findings and never
+	// changes applicability.
+	Priority Priority `json:"priority,omitzero"`
 }
 
 type Report struct {

@@ -42,9 +42,6 @@ func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 
 	report := domain.Report{Target: target, Findings: []domain.Finding{}, Dataset: dataset}
 	if target.ResolvedCPE == "" {
-		// The identity could not be resolved, so nothing was searched. This is
-		// a different answer from "searched and found nothing", and the dataset
-		// is still reported so the caller can tell the two apart.
 		trace.Add("evaluate applicability", domain.TraceSkipped, "identity was not resolved, so no applicability was evaluated")
 		report.Trace = traceIf(opts, trace)
 		return report, nil
@@ -73,6 +70,8 @@ func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 		f := buildFinding(targetCPE, v, mr, enrichmentsFor(opts, v.ID))
 		attachKEV(&f, v.ID, opts)
 		attachEnrichment(&f, v.ID, opts)
+		attachEPSS(&f, v.ID, opts)
+		f.Priority = domain.ComputePriority(f)
 		findings = append(findings, f)
 	}
 	report.Findings = findings
@@ -123,6 +122,8 @@ func detectByPURL(target domain.Target, opts Options) (domain.Report, error) {
 		f := buildPackageFinding(purl, v, pr, enrichmentsFor(opts, v.ID))
 		attachKEV(&f, v.ID, opts)
 		attachEnrichment(&f, v.ID, opts)
+		attachEPSS(&f, v.ID, opts)
+		f.Priority = domain.ComputePriority(f)
 		findings = append(findings, f)
 	}
 	trace.Add("evaluate applicability", domain.TraceOK,
@@ -203,4 +204,25 @@ func attachEnrichment(f *domain.Finding, cveID string, opts Options) {
 		return
 	}
 	f.Enrichment = &e
+}
+
+// attachEPSS copies a stored EPSS score onto the finding's risk, copying the
+// Risk struct first so the vulnerability's shared pointer is never mutated.
+// EPSS ranks a finding; it never changes applicability.
+func attachEPSS(f *domain.Finding, cveID string, opts Options) {
+	if opts.Store == nil || cveID == "" {
+		return
+	}
+	r, ok, err := opts.Store.GetEPSS(cveID)
+	if err != nil || !ok {
+		return
+	}
+	if f.Risk == nil {
+		f.Risk = &domain.Risk{}
+	} else {
+		cp := *f.Risk
+		f.Risk = &cp
+	}
+	f.Risk.EPSS = r.Score
+	f.Risk.EPSSPercentile = r.Percentile
 }

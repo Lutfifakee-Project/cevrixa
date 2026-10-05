@@ -12,6 +12,7 @@ import (
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/config"
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
+	"github.com/Lutfifakee-Project/cevrixa/internal/source/epss"
 	"github.com/Lutfifakee-Project/cevrixa/internal/source/kev"
 	"github.com/Lutfifakee-Project/cevrixa/internal/source/nvd"
 	"github.com/Lutfifakee-Project/cevrixa/internal/source/osv"
@@ -34,7 +35,7 @@ type syncFlags struct {
 func runSync(args []string) error {
 	if len(args) == 0 {
 		printSyncUsage()
-		return errors.New("sync: target required (kev, nvd, osv, or all)")
+		return errors.New("sync: target required (kev, nvd, osv, epss, or all)")
 	}
 
 	target := ""
@@ -73,31 +74,38 @@ func runSync(args []string) error {
 		return syncNVDRemote(flags.DBPath, flags.Days)
 	case "osv":
 		return syncOSVRemote(flags)
+	case "epss":
+		return syncEPSS(flags.DBPath)
 	case "all":
 		return syncAll(flags)
 	default:
-		return fmt.Errorf("sync: unknown target %q (supported: kev, nvd, osv, all)", flags.Target)
+		return fmt.Errorf("sync: unknown target %q (supported: kev, nvd, osv, epss, all)", flags.Target)
 	}
 }
 
 func syncAll(flags syncFlags) error {
-	fmt.Fprintln(os.Stderr, "sync all: [1/3] kev")
+	fmt.Fprintln(os.Stderr, "sync all: [1/4] kev")
 	if err := syncKEV(flags.DBPath, flags.Live); err != nil {
 		return err
 	}
 
-	fmt.Fprintln(os.Stderr, "sync all: [2/3] nvd")
+	fmt.Fprintln(os.Stderr, "sync all: [2/4] nvd")
 	if err := syncNVDRemote(flags.DBPath, flags.Days); err != nil {
 		return err
 	}
 
 	if flags.PURL != "" || flags.PackageName != "" {
-		fmt.Fprintln(os.Stderr, "sync all: [3/3] osv")
+		fmt.Fprintln(os.Stderr, "sync all: [3/4] osv")
 		if err := syncOSVRemote(flags); err != nil {
 			return err
 		}
 	} else {
-		fmt.Fprintln(os.Stderr, "sync all: [3/3] osv skipped (no --purl or --package)")
+		fmt.Fprintln(os.Stderr, "sync all: [3/4] osv skipped (no --purl or --package)")
+	}
+
+	fmt.Fprintln(os.Stderr, "sync all: [4/4] epss")
+	if err := syncEPSS(flags.DBPath); err != nil {
+		return err
 	}
 
 	fmt.Fprintln(os.Stderr, "sync all: done")
@@ -144,6 +152,40 @@ func syncKEV(dbPath string, live bool) error {
 	}
 	n, _ := s.CountKEV()
 	fmt.Fprintf(os.Stderr, "sync kev: %d entries from %s written\n", n, source)
+	return nil
+}
+
+// syncEPSS downloads the daily EPSS feed and stores each score. EPSS ranks
+// findings; it never changes applicability.
+func syncEPSS(dbPath string) error {
+	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
+		return fmt.Errorf("sync epss: mkdir: %w", err)
+	}
+	s, err := store.Open(dbPath)
+	if err != nil {
+		return fmt.Errorf("sync epss: open store: %w", err)
+	}
+	defer s.Close()
+
+	client := epss.NewClient(&http.Client{Timeout: 300 * time.Second})
+	scores, err := client.Fetch(context.Background())
+	if err != nil {
+		return fmt.Errorf("sync epss: %w", err)
+	}
+
+	records := make([]store.EPSSRecord, 0, len(scores))
+	for _, sc := range scores {
+		records = append(records, store.EPSSRecord{
+			CVEID:      sc.CVEID,
+			Score:      sc.Score,
+			Percentile: sc.Percentile,
+		})
+	}
+	if err := s.SaveEPSS(records); err != nil {
+		return fmt.Errorf("sync epss: save: %w", err)
+	}
+	n, _ := s.CountEPSS()
+	fmt.Fprintf(os.Stderr, "sync epss: %d scores written\n", n)
 	return nil
 }
 
@@ -301,32 +343,32 @@ func defaultDBPath() (string, error) {
 }
 
 func printSyncUsage() {
-	fmt.Println(`Usage: cevrixa sync <target> [flags]
-
-Download and persist vulnerability data to the local SQLite store.
-
-Targets:
-  kev                  Sync CISA Known Exploited Vulnerabilities
-  nvd                  Sync recent CVE records from NVD API 2.0
-  osv                  Sync OSV vulnerabilities for a package/PURL
-  all                  Sync all available targets
-
-Flags:
-  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db)
-  --days <n>           For NVD: how many days back (default: 7)
-  --full               For NVD: full history
-  --live               For KEV: fetch live from CISA
-  --purl <purl>        For OSV: package URL
-  --package <name>     For OSV: package name
-  --ecosystem <name>   For OSV: PyPI, npm, Go, Maven
-  --version <ver>      For OSV: restrict to a version
-  -h, --help           Show this help
-
-Examples:
-  cevrixa sync kev --live
-  cevrixa sync nvd --days 30
-  cevrixa sync osv --purl pkg:pypi/django
-  cevrixa sync all --days 7
-
-No NVD API key required. Rate limits are handled automatically.`)
+	fmt.Println("Usage: cevrixa sync <target> [flags]")
+	fmt.Println()
+	fmt.Println("Download and persist vulnerability data to the local SQLite store.")
+	fmt.Println()
+	fmt.Println("Targets:")
+	fmt.Println("  kev                  Sync CISA Known Exploited Vulnerabilities")
+	fmt.Println("  nvd                  Sync recent CVE records from NVD API 2.0")
+	fmt.Println("  osv                  Sync OSV vulnerabilities for a package/PURL")
+	fmt.Println("  epss                 Sync FIRST.org EPSS scores")
+	fmt.Println("  all                  Sync all available targets")
+	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Println("  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db)")
+	fmt.Println("  --days <n>           For NVD: how many days back (default: 7)")
+	fmt.Println("  --full               For NVD: full history")
+	fmt.Println("  --live               For KEV: fetch live from CISA")
+	fmt.Println("  --purl <purl>        For OSV: package URL")
+	fmt.Println("  --package <name>     For OSV: package name")
+	fmt.Println("  --ecosystem <name>   For OSV: PyPI, npm, Go, Maven")
+	fmt.Println("  --version <ver>      For OSV: restrict to a version")
+	fmt.Println("  -h, --help           Show this help")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  cevrixa sync kev --live")
+	fmt.Println("  cevrixa sync nvd --days 30")
+	fmt.Println("  cevrixa sync osv --purl pkg:pypi/django")
+	fmt.Println("  cevrixa sync epss")
+	fmt.Println("  cevrixa sync all --days 7")
 }

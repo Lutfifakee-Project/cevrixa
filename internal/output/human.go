@@ -138,6 +138,13 @@ func renderFinding(w io.Writer, f domain.Finding, opts RenderOptions) {
 		}
 	}
 	fmt.Fprintf(w, "        [*] Confidence   %s\n", strings.ToUpper(string(f.Confidence)))
+	if f.Priority.Level != "" && f.Priority.Level != domain.PriorityNone {
+		line := "        [*] Priority     " + strings.ToUpper(f.Priority.Level)
+		if len(f.Priority.Factors) > 0 {
+			line += " (" + strings.Join(f.Priority.Factors, ", ") + ")"
+		}
+		fmt.Fprintln(w, line)
+	}
 	if f.Applicability.Range != "" {
 		fmt.Fprintf(w, "        [*] Matched      %s\n", f.Applicability.Range)
 	}

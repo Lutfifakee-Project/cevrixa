@@ -59,4 +59,12 @@ var migrations = map[int][]string{
 			sources        TEXT NOT NULL DEFAULT ''
 		)`,
 	},
+	6: {
+		`CREATE TABLE IF NOT EXISTS epss (
+			cve_id     TEXT PRIMARY KEY,
+			score      REAL NOT NULL DEFAULT 0,
+			percentile REAL NOT NULL DEFAULT 0,
+			model_date TEXT NOT NULL DEFAULT ''
+		)`,
+	},
 }
