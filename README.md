@@ -5,10 +5,10 @@
 > Evidence-first vulnerability applicability intelligence.
 > Know why a vulnerability applies.
 
-<a href="https://github.com/Lutfifakee-Project/cevrixa/actions/workflows/ci.yml"><img src="https://github.com/Lutfifakee-Project/cevrixa/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-<a href="https://github.com/Lutfifakee-Project/cevrixa/releases"><img src="https://img.shields.io/github/v/release/Lutfifakee-Project/cevrixa" alt="Release"></a>
-<img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
-<img src="https://img.shields.io/badge/go-1.27-00ADD8.svg" alt="Go">
+[![CI](https://github.com/Lutfifakee-Project/cevrixa/actions/workflows/ci.yml/badge.svg)](https://github.com/Lutfifakee-Project/cevrixa/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Lutfifakee-Project/cevrixa)](https://github.com/Lutfifakee-Project/cevrixa/releases)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Go](https://img.shields.io/badge/go-1.27-00ADD8.svg)
 
 ## Overview
 
@@ -217,9 +217,9 @@ the pipeline can be exercised; those records are labelled as test data.
 
 ## Contributing
 
-See <a href="CONTRIBUTING.md">CONTRIBUTING.md</a> for the commit message format, the
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the commit message format, the
 changelog categories, and the checks a change must keep green.
 
 ## License
 
-MIT. See <a href="LICENSE">LICENSE</a>.
+MIT. See [LICENSE](LICENSE).
