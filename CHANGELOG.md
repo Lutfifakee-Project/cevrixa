@@ -22,6 +22,19 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.5.0] — 2026-10-05
+
+SPDX input. `sbom` now reads SPDX JSON as well as CycloneDX, and detects
+the format from the document.
+
+### Added
+
+- Added SPDX 2.x JSON support to `sbom`. Packages are read from their
+  `purl` external reference; a package without a PURL is skipped.
+- `sbom` now detects the SBOM format automatically (CycloneDX or SPDX).
+  An unrecognised document is an error, never a guess that silently yields no
+  targets.
+
 ## [v0.4.0] — 2026-10-05
 
 Snapshot and offline intelligence store. A detection result can now be tied to
