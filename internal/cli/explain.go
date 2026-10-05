@@ -23,6 +23,7 @@ type explainFlags struct {
 	DBSet   bool
 	Verbose bool
 	Quiet   bool
+	Trace   bool
 }
 
 func runExplain(args []string) error {
@@ -56,6 +57,8 @@ func runExplain(args []string) error {
 // applicability, and collects the evidence. It is the single reasoning path
 // shared by explain, why, and why-not, so the three cannot disagree.
 func buildExplainReport(flags explainFlags) (output.ExplainReport, error) {
+	trace := domain.Trace{}
+
 	target := domain.Target{
 		Product: flags.Product,
 		Version: flags.Version,
@@ -69,6 +72,7 @@ func buildExplainReport(flags explainFlags) (output.ExplainReport, error) {
 		return output.ExplainReport{}, fmt.Errorf("explain: %w", err)
 	}
 	target.ResolvedCPE = res.CPE
+	trace.Add("resolve identity", explainTraceStatus(res.CPE != "" || flags.PURL != ""), explainResolveDetail(target))
 
 	dbPath := resolveDBPath(flags.DB, flags.DBSet)
 
@@ -84,6 +88,7 @@ func buildExplainReport(flags explainFlags) (output.ExplainReport, error) {
 	if err != nil {
 		return output.ExplainReport{}, fmt.Errorf("explain: %w (hint: run 'cevrixa sync nvd --days 30' or pass --db path)", err)
 	}
+	trace.Add("load vulnerability", domain.TraceOK, vuln.ID+" from "+vuln.Source)
 
 	report := output.ExplainReport{
 		Vulnerability: vuln,
@@ -93,9 +98,11 @@ func buildExplainReport(flags explainFlags) (output.ExplainReport, error) {
 	switch {
 	case flags.PURL != "":
 		evaluatePURL(&report, target, vuln)
+		trace.Add("evaluate package applicability", explainTraceStatus(!report.NotEvaluated), packageTraceDetail(report))
 	case target.ResolvedCPE == "":
 		report.NotEvaluated = true
 		report.NotEvaluatedReason = "target identity could not be resolved to a CPE; pass --cpe or use a product present in the resolver catalog"
+		trace.Add("evaluate applicability", domain.TraceSkipped, report.NotEvaluatedReason)
 	default:
 		targetCPE, err := domain.ParseCPE(target.ResolvedCPE)
 		if err != nil {
@@ -108,11 +115,13 @@ func buildExplainReport(flags explainFlags) (output.ExplainReport, error) {
 		if matchErr != nil {
 			report.NotEvaluated = true
 			report.NotEvaluatedReason = matchErr.Error()
+			trace.Add("evaluate applicability", domain.TraceWarn, matchErr.Error())
 			break
 		}
 		report.Applicable = mr.Matched
 		report.Fixed = mr.Fixed
 		report.Confidence = string(engine.ConfidenceFromMode(mr.Mode))
+		trace.Add("evaluate applicability", explainTraceStatus(mr.Matched), cpeTraceDetail(mr))
 
 		if mr.Undecided {
 			report.NotEvaluated = true
@@ -121,7 +130,58 @@ func buildExplainReport(flags explainFlags) (output.ExplainReport, error) {
 	}
 
 	report.Evidence, report.Conflicts = engine.ExplainEvidence(vuln, opts)
+	trace.Add("collect evidence", domain.TraceOK, fmt.Sprintf("%d item(s), %d conflict(s)", len(report.Evidence), len(report.Conflicts)))
+
+	report.Trace = explainTraceIf(flags.Trace, trace)
 	return report, nil
+}
+
+func explainTraceIf(enabled bool, t domain.Trace) domain.Trace {
+	if !enabled {
+		return domain.Trace{}
+	}
+	return t
+}
+
+func explainTraceStatus(ok bool) string {
+	if ok {
+		return domain.TraceOK
+	}
+	return domain.TraceWarn
+}
+
+func explainResolveDetail(target domain.Target) string {
+	if target.ResolvedCPE != "" {
+		return "resolved to " + target.ResolvedCPE
+	}
+	if target.PURL != "" {
+		return "package " + target.PURL
+	}
+	return "target identity could not be resolved"
+}
+
+func cpeTraceDetail(mr matcher.Result) string {
+	switch {
+	case mr.Undecided:
+		return "undecided"
+	case mr.Matched:
+		return "matched " + mr.Range
+	default:
+		return "no match"
+	}
+}
+
+func packageTraceDetail(r output.ExplainReport) string {
+	if r.Package == nil {
+		return r.NotEvaluatedReason
+	}
+	if r.Package.Undecided {
+		return "undecided"
+	}
+	if r.Applicable {
+		return "matched " + r.Package.Range
+	}
+	return "no match"
 }
 
 // evaluatePURL fills the report from the package matcher. The package matcher
@@ -182,6 +242,10 @@ func parseTargetArgs(args []string, command string) (explainFlags, error) {
 		}
 		if arg == "--quiet" {
 			f.Quiet = true
+			continue
+		}
+		if arg == "--trace" {
+			f.Trace = true
 			continue
 		}
 
@@ -271,7 +335,7 @@ func printTargetUsage(command string) {
 		fmt.Println("Explain why a vulnerability does or does not apply to a target.")
 		fmt.Println()
 		fmt.Println("Flags: --product NAME --version VER | --cpe CPE | --purl PURL")
-		fmt.Println("       --db PATH --output human|json --verbose --quiet -h")
+		fmt.Println("       --db PATH --output human|json --verbose --quiet --trace -h")
 	}
 }
 

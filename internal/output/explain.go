@@ -43,6 +43,9 @@ type ExplainReport struct {
 	Evidence  []domain.Evidence
 	Conflicts []domain.Conflict
 
+	// Trace is the ordered reasoning path, when the caller asked for it.
+	Trace domain.Trace
+
 	// NotEvaluated reports that applicability was never evaluated for this
 	// target (for example an unresolved identity, or an unusable version). The
 	// zero value means "was evaluated", so a report that simply carries a verdict
@@ -100,6 +103,8 @@ func RenderExplainHumanWithOptions(w io.Writer, r ExplainReport, opts RenderOpti
 
 	fmt.Fprintf(w, "[+] %s\n", r.Vulnerability.ID)
 	fmt.Fprintln(w)
+
+	renderExplainVulnerability(w, r)
 
 	fmt.Fprintln(w, "    [+] Decision")
 	fmt.Fprintf(w, "        [*] Status       %s\n", r.Decision().Label())
@@ -181,18 +186,71 @@ func RenderExplainHumanWithOptions(w io.Writer, r ExplainReport, opts RenderOpti
 		for _, step := range why.Steps {
 			fmt.Fprintf(w, "        • %s\n", step)
 		}
+		for _, q := range why.Questions {
+			fmt.Fprintf(w, "        ? %s\n", q)
+		}
 		fmt.Fprintln(w)
 	}
 
-	renderExplainEvidence(w, r)
+	renderExplainEvidence(w, r, opts)
+	renderExplainTrace(w, r.Trace)
 
 	return nil
 }
 
+// renderExplainVulnerability prints the vulnerability's own metadata, so a
+// researcher can see the identity, source, and dates behind a record without
+// opening the source.
+func renderExplainVulnerability(w io.Writer, r ExplainReport) {
+	v := r.Vulnerability
+	hasHeader := v.Source != "" || v.SourceIdentifier != "" || len(v.Aliases) > 0
+	if !hasHeader && v.Summary == "" && v.Published.IsZero() && v.Modified.IsZero() {
+		return
+	}
+
+	fmt.Fprintln(w, "    [+] Vulnerability")
+	if v.Source != "" {
+		fmt.Fprintf(w, "        [*] Source       %s\n", v.Source)
+	}
+	if v.SourceIdentifier != "" && v.SourceIdentifier != v.ID {
+		fmt.Fprintf(w, "        [*] Record       %s\n", v.SourceIdentifier)
+	}
+	if len(v.Aliases) > 0 {
+		fmt.Fprintf(w, "        [*] Aliases      %s\n", strings.Join(v.Aliases, ", "))
+	}
+	if !v.Published.IsZero() {
+		fmt.Fprintf(w, "        [*] Published    %s\n", v.Published.UTC().Format("2006-01-02"))
+	}
+	if !v.Modified.IsZero() {
+		fmt.Fprintf(w, "        [*] Modified     %s\n", v.Modified.UTC().Format("2006-01-02"))
+	}
+	if v.Summary != "" {
+		fmt.Fprintf(w, "        [*] Summary      %s\n", v.Summary)
+	}
+	fmt.Fprintln(w)
+}
+
+// renderExplainTrace prints the reasoning path when one was recorded.
+func renderExplainTrace(w io.Writer, t domain.Trace) {
+	if len(t.Steps) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "    [+] Decision Trace")
+	for i, s := range t.Steps {
+		fmt.Fprintf(w, "        %s %d. %s", traceMark(s.Status), i+1, s.Name)
+		if s.Detail != "" {
+			fmt.Fprintf(w, " — %s", s.Detail)
+		}
+		fmt.Fprintln(w)
+	}
+	fmt.Fprintln(w)
+}
+
 // renderExplainEvidence prints the evidence tree and any cross-source
 // conflicts. Evidence is the first-class reasoning record, so it is shown
-// alongside the references rather than replaced by them.
-func renderExplainEvidence(w io.Writer, r ExplainReport) {
+// alongside the references rather than replaced by them. Verbose mode adds the
+// applicability detail behind each evidence item.
+func renderExplainEvidence(w io.Writer, r ExplainReport, opts RenderOptions) {
 	if len(r.Evidence) > 0 {
 		fmt.Fprintln(w, "    [+] Evidence")
 		for _, e := range r.Evidence {
@@ -204,6 +262,9 @@ func renderExplainEvidence(w io.Writer, r ExplainReport) {
 				line += " " + v
 			}
 			fmt.Fprintln(w, line)
+			if opts.Verbose && e.Applicability != nil {
+				renderApplicabilityNode(w, e.Applicability, "            ")
+			}
 		}
 		fmt.Fprintln(w)
 	}
@@ -225,6 +286,27 @@ func renderExplainEvidence(w io.Writer, r ExplainReport) {
 			}
 		}
 		fmt.Fprintln(w)
+	}
+}
+
+// renderApplicabilityNode prints the criteria and version bounds of one
+// applicability node, for verbose evidence inspection.
+func renderApplicabilityNode(w io.Writer, n *domain.ApplicabilityNode, indent string) {
+	if n.Operator != "" {
+		fmt.Fprintf(w, "%s%s\n", indent, n.Operator)
+	}
+	for _, m := range n.Matches {
+		line := indent + "  " + m.Criteria
+		if m.VersionStart != "" {
+			line += " start=" + m.VersionStart
+		}
+		if m.VersionEnd != "" {
+			line += " end=" + m.VersionEnd
+		}
+		fmt.Fprintln(w, line)
+	}
+	for _, child := range n.Children {
+		renderApplicabilityNode(w, &child, indent+"  ")
 	}
 }
 
@@ -262,35 +344,49 @@ func formatEvidenceRange(r *domain.PackageRange) string {
 
 func RenderExplainJSON(w io.Writer, r ExplainReport) error {
 	type jsonOut struct {
-		VulnerabilityID string             `json:"vulnerability_id"`
-		Source          string             `json:"source"`
-		Summary         string             `json:"summary,omitempty"`
-		Decision        string             `json:"decision"`
-		Undecided       bool               `json:"undecided,omitempty"`
-		Reason          string             `json:"reason,omitempty"`
-		Confidence      string             `json:"confidence"`
-		Target          domain.Target      `json:"target"`
-		Applicability   map[string]any     `json:"applicability,omitempty"`
-		Fixed           string             `json:"fixed,omitempty"`
-		References      []domain.Reference `json:"references,omitempty"`
-		Why             domain.Why         `json:"why,omitempty"`
-		Evidence        []domain.Evidence  `json:"evidence,omitempty"`
-		Conflicts       []domain.Conflict  `json:"conflicts,omitempty"`
+		VulnerabilityID  string             `json:"vulnerability_id"`
+		Source           string             `json:"source"`
+		SourceIdentifier string             `json:"source_identifier,omitempty"`
+		Aliases          []string           `json:"aliases,omitempty"`
+		Summary          string             `json:"summary,omitempty"`
+		Published        string             `json:"published,omitempty"`
+		Modified         string             `json:"modified,omitempty"`
+		Decision         string             `json:"decision"`
+		Undecided        bool               `json:"undecided,omitempty"`
+		Reason           string             `json:"reason,omitempty"`
+		Confidence       string             `json:"confidence"`
+		Target           domain.Target      `json:"target"`
+		Applicability    map[string]any     `json:"applicability,omitempty"`
+		Fixed            string             `json:"fixed,omitempty"`
+		References       []domain.Reference `json:"references,omitempty"`
+		Why              domain.Why         `json:"why,omitempty"`
+		Evidence         []domain.Evidence  `json:"evidence,omitempty"`
+		Conflicts        []domain.Conflict  `json:"conflicts,omitempty"`
+		Trace            domain.Trace       `json:"trace,omitzero"`
 	}
 	out := jsonOut{
-		VulnerabilityID: r.Vulnerability.ID,
-		Source:          r.Vulnerability.Source,
-		Summary:         r.Vulnerability.Summary,
-		Decision:        string(r.Decision()),
-		Undecided:       r.Match.Undecided || r.NotEvaluated || r.undecidedPackage(),
-		Reason:          r.reason(),
-		Confidence:      r.Confidence,
-		Target:          r.Target,
-		Fixed:           r.Fixed,
-		References:      r.Vulnerability.References,
-		Why:             r.why(),
-		Evidence:        r.Evidence,
-		Conflicts:       r.Conflicts,
+		VulnerabilityID:  r.Vulnerability.ID,
+		Source:           r.Vulnerability.Source,
+		SourceIdentifier: r.Vulnerability.SourceIdentifier,
+		Aliases:          r.Vulnerability.Aliases,
+		Summary:          r.Vulnerability.Summary,
+		Decision:         string(r.Decision()),
+		Undecided:        r.Match.Undecided || r.NotEvaluated || r.undecidedPackage(),
+		Reason:           r.reason(),
+		Confidence:       r.Confidence,
+		Target:           r.Target,
+		Fixed:            r.Fixed,
+		References:       r.Vulnerability.References,
+		Why:              r.why(),
+		Evidence:         r.Evidence,
+		Conflicts:        r.Conflicts,
+		Trace:            r.Trace,
+	}
+	if !r.Vulnerability.Published.IsZero() {
+		out.Published = r.Vulnerability.Published.UTC().Format("2006-01-02")
+	}
+	if !r.Vulnerability.Modified.IsZero() {
+		out.Modified = r.Vulnerability.Modified.UTC().Format("2006-01-02")
 	}
 	if r.Match.Criteria != "" {
 		out.Applicability = map[string]any{
