@@ -22,6 +22,15 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.2.4] — 2026-10-05
+
+### Changed
+
+- Removed dead code: `defaultKEVDBPath`, an unused duplicate of
+  `defaultDBPath`; `engine.Options.Source`, a field set by three commands
+  but never read by the engine; and `errNotImplemented` with its unused
+  `errors` import. No behaviour change.
+
 ## [v0.2.3] — 2026-10-05
 
 Portability and reliability release. Cevrixa now builds for Linux, macOS, and
