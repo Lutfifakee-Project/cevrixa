@@ -22,6 +22,16 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.3.2] — 2026-10-05
+
+### Added
+
+- Added `why` and `why-not` commands. `why` answers why a target is
+  affected; `why-not` answers why it is not. Both use the same reasoning
+  path as `explain`, so the three cannot disagree, and neither invents a
+  reason that contradicts the verdict: when the question does not match the
+  decision, the command says so and prints the real decision instead.
+
 ## [v0.3.1] — 2026-10-05
 
 ### Added
