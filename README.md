@@ -1,4 +1,4 @@
-<img src="assets/banner.png" alt="Cevrixa" width="600">
+![Cevrixa](assets/banner.png)
 
 # Cevrixa
 
