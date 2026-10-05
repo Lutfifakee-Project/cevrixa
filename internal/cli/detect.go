@@ -13,18 +13,19 @@ import (
 var errHelpRequested = errors.New("help requested")
 
 type detectFlags struct {
-	Product string
-	Version string
-	CPE     string
-	PURL    string
-	Output  string
-	WithKEV bool
-	FailOn  string
-	DB      string
-	DBSet   bool
-	Verbose bool
-	Quiet   bool
-	Trace   bool
+	Product  string
+	Version  string
+	CPE      string
+	PURL     string
+	Output   string
+	WithKEV  bool
+	FailOn   string
+	DB       string
+	DBSet    bool
+	Snapshot string
+	Verbose  bool
+	Quiet    bool
+	Trace    bool
 }
 
 func runDetect(args []string) error {
@@ -43,7 +44,10 @@ func runDetect(args []string) error {
 		PURL:    flags.PURL,
 	}
 
-	dbPath := resolveDBPath(flags.DB, flags.DBSet)
+	dbPath, err := resolveStorePath(flags.DB, flags.DBSet, flags.Snapshot)
+	if err != nil {
+		return fmt.Errorf("detect: %w", err)
+	}
 
 	opts := engine.Options{Trace: flags.Trace}
 	if flags.WithKEV {
@@ -54,9 +58,11 @@ func runDetect(args []string) error {
 		opts.KEV = entries
 	}
 
-	if s, err := openStoreIfDB(dbPath); err != nil {
+	s, err := openStoreIfDB(dbPath)
+	if err != nil {
 		return fmt.Errorf("detect: %w", err)
-	} else if s != nil {
+	}
+	if s != nil {
 		defer s.Close()
 		opts.Store = s
 	}
@@ -64,6 +70,13 @@ func runDetect(args []string) error {
 	report, err := engine.Detect(target, opts)
 	if err != nil {
 		return fmt.Errorf("detect: %w", err)
+	}
+
+	report.Dataset.Snapshot = flags.Snapshot
+	if s != nil {
+		if d, derr := s.Digest(); derr == nil {
+			report.Dataset.Digest = d
+		}
 	}
 
 	var renderErr error
@@ -148,6 +161,8 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 		case "--db":
 			f.DB = value
 			f.DBSet = true
+		case "--snapshot":
+			f.Snapshot = value
 		default:
 			return f, fmt.Errorf("detect: unknown flag %q", key)
 		}
@@ -192,6 +207,9 @@ func validateDetectFlags(f detectFlags) error {
 	if f.Product == "" && f.Version != "" {
 		return errors.New("detect: --version requires --product")
 	}
+	if f.DBSet && f.Snapshot != "" {
+		return errors.New("detect: use only one of --db or --snapshot")
+	}
 	switch f.Output {
 	case "", "human", "json", "jsonl", "sarif":
 	default:
@@ -215,7 +233,9 @@ Flags:
   --purl <purl>        Package URL (e.g. pkg:pypi/django@4.2.0)
   --with-kev           Enrich findings with CISA KEV data
   --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
-  --fail-on <level>    Exit non-zero if any finding matches: none, any, affected, inconclusive, kev, or a severity (low, medium, high, critical)
+  --snapshot <name>    Read from a named snapshot instead of the live store
+  --fail-on <level>    Exit non-zero on a matching finding: none, any, affected,
+                       inconclusive, kev, or a severity (low, medium, high, critical)
   --verbose            Show full reasoning steps
   --quiet              Print only CVE-ID + status per finding
   --trace              Show the decision trace behind the result
@@ -225,5 +245,5 @@ Flags:
 Examples:
   cevrixa detect --product "Apache HTTP Server" --version "2.4.49"
   cevrixa detect --purl "pkg:pypi/django@4.2.0"
-  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --trace`)
+  cevrixa detect --cpe cpe:2.3:a:apache:http_server:2.4.49:::::::* --snapshot 2026-09-30`)
 }

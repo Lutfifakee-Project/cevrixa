@@ -29,6 +29,8 @@ func Run(args []string) error {
 		return runWhy(args[1:])
 	case "why-not":
 		return runWhyNot(args[1:])
+	case "snapshot":
+		return runSnapshot(args[1:])
 	case "info":
 		return runInfo(args[1:])
 	case "doctor":
@@ -55,6 +57,7 @@ Commands:
   explain    Explain why a vulnerability applies or not
   why        Answer why a target is affected
   why-not    Answer why a target is not affected
+  snapshot   Create and list frozen intelligence snapshots
   info       Show environment and data status
   doctor     Run environment and data health checks
   version    Print version information

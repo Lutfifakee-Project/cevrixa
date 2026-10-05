@@ -4,11 +4,15 @@ package domain
 //
 // It exists so that "no findings" can never be silently confused with "no
 // data": a caller can always tell which records were searched, and whether
-// embedded test fixtures contributed to the answer.
+// embedded test fixtures contributed to the answer. When the report came from
+// a named snapshot, the snapshot name and its digest identify the exact
+// intelligence state, so the result can be reproduced.
 type DatasetInfo struct {
 	StoreRecords   int      `json:"store_records"`
 	FixtureRecords int      `json:"fixture_records"`
 	Sources        []string `json:"sources,omitempty"`
+	Snapshot       string   `json:"snapshot,omitempty"`
+	Digest         string   `json:"digest,omitempty"`
 }
 
 // Total returns the number of records that were searched.

@@ -48,4 +48,15 @@ var migrations = map[int][]string{
 	4: {
 		`DELETE FROM enrichments WHERE source = 'dbcve'`,
 	},
+	5: {
+		`CREATE TABLE IF NOT EXISTS snapshot_meta (
+			id             INTEGER PRIMARY KEY CHECK (id = 1),
+			name           TEXT NOT NULL DEFAULT '',
+			created_at     INTEGER NOT NULL DEFAULT 0,
+			engine_version TEXT NOT NULL DEFAULT '',
+			digest         TEXT NOT NULL DEFAULT '',
+			record_count   INTEGER NOT NULL DEFAULT 0,
+			sources        TEXT NOT NULL DEFAULT ''
+		)`,
+	},
 }

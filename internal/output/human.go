@@ -83,7 +83,7 @@ func traceMark(status string) string {
 // zero-finding result can be told apart from a run against no data, and so that
 // embedded test fixtures are never mistaken for vulnerability intelligence.
 func renderDataset(w io.Writer, d domain.DatasetInfo) {
-	if d.Empty() && len(d.Sources) == 0 {
+	if d.Empty() && len(d.Sources) == 0 && d.Snapshot == "" {
 		fmt.Fprintln(w, "    [*] Dataset      none (no local store and no embedded fixtures)")
 		return
 	}
@@ -94,7 +94,13 @@ func renderDataset(w io.Writer, d domain.DatasetInfo) {
 	if len(d.Sources) > 0 {
 		desc += " [" + strings.Join(d.Sources, ", ") + "]"
 	}
+	if d.Snapshot != "" {
+		desc += " snapshot=" + d.Snapshot
+	}
 	fmt.Fprintf(w, "    [*] Dataset      %s\n", desc)
+	if d.Digest != "" {
+		fmt.Fprintf(w, "    [*] Digest       %s\n", d.Digest)
+	}
 }
 
 func renderTarget(w io.Writer, t domain.Target) {
