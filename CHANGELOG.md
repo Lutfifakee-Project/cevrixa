@@ -22,6 +22,31 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.3.0] — 2026-10-05
+
+Evidence and explainability release. `explain` now evaluates package
+(PURL) targets and shows the evidence behind a decision.
+
+### Added
+
+- `explain` now evaluates package targets. A `--purl` target is run
+  through the same package matcher as `detect`, so the two cannot disagree.
+  Previously every package target was reported as `INCONCLUSIVE` with a
+  "not evaluated yet" note.
+- `explain` now prints the correlated evidence tree: the status, severity,
+  CVSS, references, and applicability statements behind a decision, not just
+  the reference list.
+- `explain` now reports cross-source conflicts when sources disagree, using
+  the same correlation that `detect` uses.
+- `explain --output json` now carries `why`, `evidence`, and
+  `conflicts` alongside the decision.
+
+### Detection
+
+- A package target whose vulnerability carries no package applicability naming
+  that package is reported as `inconclusive`, not `not_affected`: an
+  unanswerable question is a gap in the record, not a clean result.
+
 ## [v0.2.4] — 2026-10-05
 
 ### Changed
