@@ -22,6 +22,23 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.8.0] — 2026-10-06
+
+Integration. Commands read from a frozen snapshot, and detect accepts a target
+from stdin, so Cevrixa composes cleanly in a pipeline.
+
+### Added
+
+- `scan` and `sbom` now accept `--snapshot <name>`, matching `detect`, so a batch
+  or an SBOM can be evaluated against a frozen intelligence state.
+- `detect -` reads one target JSON object from stdin, for pipelines such as
+  `generate-target | cevrixa detect -`.
+
+### Changed
+
+- `--db` and `--snapshot` are mutually exclusive on `scan` and `sbom`, as they
+  already were on `detect`.
+
 ## [v0.7.0] — 2026-10-06
 
 Remediation intelligence. An affected finding now states what to do about it.
