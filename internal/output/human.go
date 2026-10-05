@@ -32,6 +32,7 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, "    [!] No matching vulnerabilities found in the current local dataset.")
 		fmt.Fprintln(w, "        This does NOT prove the target is not affected.")
+		renderTrace(w, r.Trace)
 		return nil
 	}
 
@@ -40,8 +41,42 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 		renderFinding(w, f, opts)
 	}
 
+	renderTrace(w, r.Trace)
 	printAttributionFooter(w, r.Findings)
 	return nil
+}
+
+// renderTrace prints the reasoning path behind a decision, so a reader can see
+// how the verdict was reached and not only its result.
+func renderTrace(w io.Writer, t domain.Trace) {
+	if len(t.Steps) == 0 {
+		return
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, "[+] Decision Trace")
+	for i, s := range t.Steps {
+		mark := traceMark(s.Status)
+		fmt.Fprintf(w, "    %s %d. %s", mark, i+1, s.Name)
+		if s.Detail != "" {
+			fmt.Fprintf(w, " — %s", s.Detail)
+		}
+		fmt.Fprintln(w)
+	}
+}
+
+func traceMark(status string) string {
+	switch status {
+	case domain.TraceOK:
+		return "[+]"
+	case domain.TraceSkipped:
+		return "[-]"
+	case domain.TraceWarn:
+		return "[!]"
+	case domain.TraceFail:
+		return "[x]"
+	default:
+		return "[*]"
+	}
 }
 
 // renderDataset states which records a report was computed from, so that a

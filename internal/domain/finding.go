@@ -56,6 +56,9 @@ type Report struct {
 	Target   Target      `json:"target"`
 	Findings []Finding   `json:"findings"`
 	Dataset  DatasetInfo `json:"dataset"`
+	// Trace records the reasoning path behind this report's decision. It is
+	// populated when the caller asked for it, and omitted otherwise.
+	Trace Trace `json:"trace,omitzero"`
 }
 
 // severityRank orders canonical severity labels from least to most severe.

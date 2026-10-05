@@ -12,6 +12,8 @@ import (
 type Options struct {
 	KEV   map[string]domain.KEVInfo
 	Store *store.Store
+	// Trace asks detection to record the reasoning path behind the decision.
+	Trace bool
 }
 
 func Detect(target domain.Target, opts Options) (domain.Report, error) {
@@ -22,23 +24,29 @@ func Detect(target domain.Target, opts Options) (domain.Report, error) {
 }
 
 func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
+	trace := domain.Trace{}
+
 	r := resolver.New()
 	res, err := r.Resolve(target)
 	if err != nil {
 		return domain.Report{}, err
 	}
 	target.ResolvedCPE = res.CPE
+	trace.Add("resolve identity", traceStatus(res.CPE != ""), resolveDetail(target, res))
 
 	vulns, dataset, err := loadVulnerabilities(opts)
 	if err != nil {
 		return domain.Report{}, err
 	}
+	trace.Add("candidate discovery", domain.TraceOK, fmt.Sprintf("searched %d record(s)", len(vulns)))
 
 	report := domain.Report{Target: target, Findings: []domain.Finding{}, Dataset: dataset}
 	if target.ResolvedCPE == "" {
 		// The identity could not be resolved, so nothing was searched. This is
 		// a different answer from "searched and found nothing", and the dataset
 		// is still reported so the caller can tell the two apart.
+		trace.Add("evaluate applicability", domain.TraceSkipped, "identity was not resolved, so no applicability was evaluated")
+		report.Trace = traceIf(opts, trace)
 		return report, nil
 	}
 
@@ -48,6 +56,7 @@ func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 	}
 
 	findings := []domain.Finding{}
+	matched, undecided := 0, 0
 	for _, v := range vulns {
 		mr, err := matcher.MatchCPE(targetCPE, v)
 		if err != nil {
@@ -56,17 +65,28 @@ func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 		if !mr.Matched && !mr.Undecided {
 			continue
 		}
+		if mr.Undecided {
+			undecided++
+		} else {
+			matched++
+		}
 		f := buildFinding(targetCPE, v, mr, enrichmentsFor(opts, v.ID))
 		attachKEV(&f, v.ID, opts)
 		attachEnrichment(&f, v.ID, opts)
 		findings = append(findings, f)
 	}
 	report.Findings = findings
+	trace.Add("evaluate applicability", domain.TraceOK,
+		fmt.Sprintf("matched %d, inconclusive %d, not affected %d", matched, undecided, len(vulns)-matched-undecided))
+	trace.Add("decide", traceStatus(matched > 0), decideDetail(matched, undecided, len(findings)))
+	report.Trace = traceIf(opts, trace)
 
 	return report, nil
 }
 
 func detectByPURL(target domain.Target, opts Options) (domain.Report, error) {
+	trace := domain.Trace{}
+
 	purl, err := domain.ParsePURL(target.PURL)
 	if err != nil {
 		return domain.Report{}, fmt.Errorf("engine: parse PURL: %w", err)
@@ -74,13 +94,16 @@ func detectByPURL(target domain.Target, opts Options) (domain.Report, error) {
 	if purl.Version == "" {
 		return domain.Report{}, fmt.Errorf("engine: PURL must include a version")
 	}
+	trace.Add("resolve identity", domain.TraceOK, "package "+purl.Name+"@"+purl.Version+" ("+purl.Type+")")
 
 	vulns, dataset, err := loadVulnerabilities(opts)
 	if err != nil {
 		return domain.Report{}, err
 	}
+	trace.Add("candidate discovery", domain.TraceOK, fmt.Sprintf("searched %d record(s)", len(vulns)))
 
 	findings := []domain.Finding{}
+	matched, undecided := 0, 0
 	for _, v := range vulns {
 		if len(v.PackageApplicability) == 0 {
 			continue
@@ -92,13 +115,58 @@ func detectByPURL(target domain.Target, opts Options) (domain.Report, error) {
 		if !pr.Matched && !pr.Undecided {
 			continue
 		}
+		if pr.Undecided {
+			undecided++
+		} else {
+			matched++
+		}
 		f := buildPackageFinding(purl, v, pr, enrichmentsFor(opts, v.ID))
 		attachKEV(&f, v.ID, opts)
 		attachEnrichment(&f, v.ID, opts)
 		findings = append(findings, f)
 	}
+	trace.Add("evaluate applicability", domain.TraceOK,
+		fmt.Sprintf("matched %d, inconclusive %d", matched, undecided))
+	trace.Add("decide", traceStatus(matched > 0), decideDetail(matched, undecided, len(findings)))
 
-	return domain.Report{Target: target, Findings: findings, Dataset: dataset}, nil
+	return domain.Report{Target: target, Findings: findings, Dataset: dataset, Trace: traceIf(opts, trace)}, nil
+}
+
+// traceIf returns the trace only when the caller asked for one, so a normal
+// detection does not carry reasoning noise it never requested.
+func traceIf(opts Options, t domain.Trace) domain.Trace {
+	if !opts.Trace {
+		return domain.Trace{}
+	}
+	return t
+}
+
+func traceStatus(ok bool) string {
+	if ok {
+		return domain.TraceOK
+	}
+	return domain.TraceWarn
+}
+
+func resolveDetail(target domain.Target, res resolver.Result) string {
+	if target.ResolvedCPE != "" {
+		return "resolved to " + target.ResolvedCPE
+	}
+	if res.CPE != "" {
+		return "resolved to " + res.CPE
+	}
+	return "target identity could not be resolved"
+}
+
+func decideDetail(matched, undecided, findings int) string {
+	switch {
+	case matched > 0:
+		return fmt.Sprintf("%d affected finding(s)", matched)
+	case undecided > 0:
+		return fmt.Sprintf("%d inconclusive finding(s)", undecided)
+	default:
+		return "no affected or inconclusive finding"
+	}
 }
 
 // enrichmentsFor returns every stored enrichment for a vulnerability, from all

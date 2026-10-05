@@ -24,6 +24,7 @@ type detectFlags struct {
 	DBSet   bool
 	Verbose bool
 	Quiet   bool
+	Trace   bool
 }
 
 func runDetect(args []string) error {
@@ -44,7 +45,7 @@ func runDetect(args []string) error {
 
 	dbPath := resolveDBPath(flags.DB, flags.DBSet)
 
-	opts := engine.Options{}
+	opts := engine.Options{Trace: flags.Trace}
 	if flags.WithKEV {
 		entries, _, err := loadKEV(true, dbPath)
 		if err != nil {
@@ -115,6 +116,10 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 		}
 		if arg == "--quiet" {
 			f.Quiet = true
+			continue
+		}
+		if arg == "--trace" {
+			f.Trace = true
 			continue
 		}
 
@@ -213,11 +218,12 @@ Flags:
   --fail-on <level>    Exit non-zero if any finding matches: none, any, affected, inconclusive, kev, or a severity (low, medium, high, critical)
   --verbose            Show full reasoning steps
   --quiet              Print only CVE-ID + status per finding
+  --trace              Show the decision trace behind the result
   --output <fmt>       Output format: human (default), json, jsonl, or sarif
   -h, --help           Show this help
 
 Examples:
   cevrixa detect --product "Apache HTTP Server" --version "2.4.49"
   cevrixa detect --purl "pkg:pypi/django@4.2.0"
-  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --verbose`)
+  cevrixa detect --product "Apache HTTP Server" --version "2.4.49" --trace`)
 }
