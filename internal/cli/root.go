@@ -1,12 +1,9 @@
 package cli
 
 import (
-	"errors"
 	"fmt"
 	"os"
 )
-
-var errNotImplemented = errors.New("not implemented in this milestone")
 
 func Run(args []string) error {
 	if len(args) == 0 {

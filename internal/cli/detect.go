@@ -46,12 +46,11 @@ func runDetect(args []string) error {
 
 	opts := engine.Options{}
 	if flags.WithKEV {
-		entries, src, err := loadKEV(true, dbPath)
+		entries, _, err := loadKEV(true, dbPath)
 		if err != nil {
 			return fmt.Errorf("detect: %w", err)
 		}
 		opts.KEV = entries
-		opts.Source = src
 	}
 
 	if s, err := openStoreIfDB(dbPath); err != nil {

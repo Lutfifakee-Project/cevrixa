@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/source/kev"
@@ -70,12 +69,4 @@ func resolveDBPath(requested string, wasSet bool) string {
 		return ""
 	}
 	return p
-}
-
-func defaultKEVDBPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".cevrixa", "cevrixa.db")
 }

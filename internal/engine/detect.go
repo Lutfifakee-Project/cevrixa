@@ -10,9 +10,8 @@ import (
 )
 
 type Options struct {
-	KEV    map[string]domain.KEVInfo
-	Source string
-	Store  *store.Store
+	KEV   map[string]domain.KEVInfo
+	Store *store.Store
 }
 
 func Detect(target domain.Target, opts Options) (domain.Report, error) {
