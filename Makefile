@@ -1,6 +1,6 @@
 BINARY  := cevrixa
 PKG     := ./cmd/cevrixa
-VERSION ?= v0.3.2
+VERSION ?= v0.4.0
 COMMIT  ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 DATE    ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo unknown)
 

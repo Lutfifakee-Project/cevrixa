@@ -22,6 +22,24 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.4.0] — 2026-10-05
+
+Snapshot and offline intelligence store. A detection result can now be tied to
+a frozen intelligence state, so it can be reproduced.
+
+### Added
+
+- Added the `snapshot` command. `snapshot create <name>` freezes the
+  current store into `~/.cevrixa/snapshots/<name>.db` and stamps it with
+  metadata and a digest; `snapshot list` enumerates snapshots.
+- Added `--snapshot <name>` to `detect`, to run against a frozen state
+  instead of the live store. A missing snapshot is an error, never a silent
+  fallback to the current data.
+- Every report now states its intelligence state: the dataset carries the
+  snapshot name and a deterministic SHA-256 digest of the records searched.
+- Added a store digest: a stable hash over the stored vulnerability records, so
+  two reports can be shown to come from the same state.
+
 ## [v0.3.2] — 2026-10-05
 
 ### Added
