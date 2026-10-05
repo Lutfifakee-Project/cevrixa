@@ -22,6 +22,25 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.6.0] — 2026-10-06
+
+EPSS and prioritization. Findings are now ranked by urgency using KEV,
+severity, and EPSS, without ever changing applicability.
+
+### Added
+
+- Added an EPSS source: `sync epss` downloads the FIRST.org EPSS feed and
+  stores per-CVE probability scores. The feed is read gzip or plain, and is
+  parsed defensively.
+- Added `priority` to every finding. Only an affected finding has a priority;
+  the level is `critical`, `high`, `medium`, or `low`, with the factors
+  that produced it recorded (known exploitation, severity, EPSS).
+- Findings now carry the EPSS score and percentile when one is stored.
+
+### Changed
+
+- `sync all` now includes EPSS as a fourth step.
+
 ## [v0.5.0] — 2026-10-05
 
 SPDX input. `sbom` now reads SPDX JSON as well as CycloneDX, and detects
