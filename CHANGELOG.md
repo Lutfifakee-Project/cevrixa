@@ -22,6 +22,16 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.3.1] — 2026-10-05
+
+### Added
+
+- Added a decision trace to `detect` via `--trace`. The trace records the
+  ordered reasoning path behind a result — identity resolution, candidate
+  discovery, applicability evaluation, and the decision — so a reader can see
+  how a verdict was reached, not only its result. It is also carried in
+  `--output json`. The trace is off unless requested.
+
 ## [v0.3.0] — 2026-10-05
 
 Evidence and explainability release. `explain` now evaluates package
