@@ -53,6 +53,8 @@ type Finding struct {
 	// Priority ranks urgency. It is set only for affected findings and never
 	// changes applicability.
 	Priority Priority `json:"priority,omitzero"`
+	// Remediation is the derived fix guidance, set only for affected findings.
+	Remediation Remediation `json:"remediation,omitzero"`
 }
 
 type Report struct {

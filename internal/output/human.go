@@ -151,6 +151,16 @@ func renderFinding(w io.Writer, f domain.Finding, opts RenderOptions) {
 	if len(f.FixedVersions) > 0 {
 		fmt.Fprintf(w, "        [*] Fixed        %s\n", f.FixedVersions[0])
 	}
+	if f.Remediation.Action != "" {
+		line := "        [*] Fix          " + f.Remediation.Action
+		if f.Remediation.FixedVersion != "" {
+			line += " to " + f.Remediation.FixedVersion
+		}
+		if f.Remediation.Note != "" {
+			line += " - " + f.Remediation.Note
+		}
+		fmt.Fprintln(w, line)
+	}
 	if f.KnownExploited != nil {
 		line := "        [*] KEV          YES"
 		if f.KnownExploited.DateAdded != "" {

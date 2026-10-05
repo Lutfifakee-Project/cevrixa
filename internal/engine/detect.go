@@ -72,6 +72,7 @@ func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 		attachEnrichment(&f, v.ID, opts)
 		attachEPSS(&f, v.ID, opts)
 		f.Priority = domain.ComputePriority(f)
+		f.Remediation = domain.BuildRemediation(f)
 		findings = append(findings, f)
 	}
 	report.Findings = findings
@@ -124,6 +125,7 @@ func detectByPURL(target domain.Target, opts Options) (domain.Report, error) {
 		attachEnrichment(&f, v.ID, opts)
 		attachEPSS(&f, v.ID, opts)
 		f.Priority = domain.ComputePriority(f)
+		f.Remediation = domain.BuildRemediation(f)
 		findings = append(findings, f)
 	}
 	trace.Add("evaluate applicability", domain.TraceOK,
