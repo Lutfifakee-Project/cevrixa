@@ -22,6 +22,20 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.7.0] — 2026-10-06
+
+Remediation intelligence. An affected finding now states what to do about it.
+
+### Added
+
+- Added a derived remediation to every affected finding: an `upgrade` action
+  with the fixed version when one is known, or a `monitor` action when no
+  fixed version is available. A not_affected or inconclusive finding has no
+  remediation. The guidance is derived from data the engine already holds; it
+  never invents a fixed version.
+- `detect` and `scan` output now shows the fix action, and JSON carries a
+  `remediation` object.
+
 ## [v0.6.0] — 2026-10-06
 
 EPSS and prioritization. Findings are now ranked by urgency using KEV,
