@@ -5,10 +5,13 @@
 > Evidence-first vulnerability applicability intelligence.
 > Know why a vulnerability applies.
 
+<p align="center">
+
 [![CI](https://github.com/Lutfifakee-Project/cevrixa/actions/workflows/ci.yml/badge.svg)](https://github.com/Lutfifakee-Project/cevrixa/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Lutfifakee-Project/cevrixa)](https://github.com/Lutfifakee-Project/cevrixa/releases)
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Go](https://img.shields.io/badge/go-1.27-00ADD8.svg)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+</p>
 
 ## Overview
 
@@ -205,15 +208,13 @@ When the answer cannot be determined, Cevrixa says so:
 ## Supported Sources
 
 | Source | Provides |
-|---|---|
-| **NVD** | CVE records and CPE applicability statements (API 2.0) |
-| **OSV** | Package vulnerability ranges |
-| **CISA KEV** | Known exploited vulnerabilities (enrichment) |
+| --- | --- |
+| NVD | CVE records and CPE applicability statements |
+| OSV | Package vulnerability ranges |
+| CISA KEV | Known exploited vulnerabilities |
 
-Coverage depends on which datasets have been synchronised. Every report states
-how many records were searched and which sources contributed. When no local
-database is present, Cevrixa falls back to a small set of embedded fixtures so
-the pipeline can be exercised; those records are labelled as test data.
+Coverage depends on the datasets synchronised locally. Reports identify
+the sources and records used for each result.
 
 ## Contributing
 
