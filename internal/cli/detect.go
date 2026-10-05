@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
@@ -23,6 +25,7 @@ type detectFlags struct {
 	DB       string
 	DBSet    bool
 	Snapshot string
+	Stdin    bool
 	Verbose  bool
 	Quiet    bool
 	Trace    bool
@@ -42,6 +45,13 @@ func runDetect(args []string) error {
 		Version: flags.Version,
 		CPE:     flags.CPE,
 		PURL:    flags.PURL,
+	}
+	if flags.Stdin {
+		t, err := readOneTarget(os.Stdin)
+		if err != nil {
+			return fmt.Errorf("detect: %w", err)
+		}
+		target = t
 	}
 
 	dbPath, err := resolveStorePath(flags.DB, flags.DBSet, flags.Snapshot)
@@ -109,12 +119,37 @@ func runDetect(args []string) error {
 	return nil
 }
 
+// readOneTarget reads a single target JSON object, for "detect -". A JSON
+// object is expected; an array is rejected so that the caller uses scan for
+// multiple targets.
+func readOneTarget(r io.Reader) (domain.Target, error) {
+	raw, err := io.ReadAll(io.LimitReader(r, 1<<20))
+	if err != nil {
+		return domain.Target{}, fmt.Errorf("read stdin: %w", err)
+	}
+	if len(raw) == 0 {
+		return domain.Target{}, errors.New("empty input")
+	}
+	var t domain.Target
+	if err := json.Unmarshal(raw, &t); err != nil {
+		return domain.Target{}, fmt.Errorf("parse target: %w", err)
+	}
+	if t.Product == "" && t.CPE == "" && t.PURL == "" {
+		return domain.Target{}, errors.New("target has no product, cpe, or purl")
+	}
+	return t, nil
+}
+
 func parseDetectArgs(args []string) (detectFlags, error) {
 	var f detectFlags
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 
+		if arg == "-" {
+			f.Stdin = true
+			continue
+		}
 		if arg == "-h" || arg == "--help" {
 			printDetectUsage()
 			return detectFlags{}, errHelpRequested
@@ -195,8 +230,14 @@ func validateDetectFlags(f detectFlags) error {
 		identityCount++
 	}
 
-	if identityCount == 0 {
-		return errors.New("detect: one of --product, --cpe, or --purl is required")
+	if f.Stdin {
+		if identityCount != 0 {
+			return errors.New("detect: use either - or an identity flag, not both")
+		}
+	} else {
+		if identityCount == 0 {
+			return errors.New("detect: one of --product, --cpe, --purl, or - is required")
+		}
 	}
 	if identityCount > 1 {
 		return errors.New("detect: use only one of --product, --cpe, or --purl")
@@ -222,28 +263,28 @@ func validateDetectFlags(f detectFlags) error {
 }
 
 func printDetectUsage() {
-	fmt.Println(`Usage: cevrixa detect [flags]
-
-Determine whether a target is affected by known vulnerabilities.
-
-Flags:
-  --product <name>     Product name (requires --version)
-  --version <ver>      Product version
-  --cpe <cpe>          CPE 2.3 identifier
-  --purl <purl>        Package URL (e.g. pkg:pypi/django@4.2.0)
-  --with-kev           Enrich findings with CISA KEV data
-  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
-  --snapshot <name>    Read from a named snapshot instead of the live store
-  --fail-on <level>    Exit non-zero on a matching finding: none, any, affected,
-                       inconclusive, kev, or a severity (low, medium, high, critical)
-  --verbose            Show full reasoning steps
-  --quiet              Print only CVE-ID + status per finding
-  --trace              Show the decision trace behind the result
-  --output <fmt>       Output format: human (default), json, jsonl, or sarif
-  -h, --help           Show this help
-
-Examples:
-  cevrixa detect --product "Apache HTTP Server" --version "2.4.49"
-  cevrixa detect --purl "pkg:pypi/django@4.2.0"
-  cevrixa detect --cpe cpe:2.3:a:apache:http_server:2.4.49:::::::* --snapshot 2026-09-30`)
+	fmt.Println("Usage: cevrixa detect [flags]")
+	fmt.Println("       cevrixa detect -          (read one target JSON object from stdin)")
+	fmt.Println()
+	fmt.Println("Determine whether a target is affected by known vulnerabilities.")
+	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Println("  --product <name>     Product name (requires --version)")
+	fmt.Println("  --version <ver>      Product version")
+	fmt.Println("  --cpe <cpe>          CPE 2.3 identifier")
+	fmt.Println("  --purl <purl>        Package URL (e.g. pkg:pypi/django@4.2.0)")
+	fmt.Println("  --with-kev           Enrich findings with CISA KEV data")
+	fmt.Println("  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)")
+	fmt.Println("  --snapshot <name>    Read from a named snapshot instead of the live store")
+	fmt.Println("  --fail-on <level>    Exit non-zero on a matching finding")
+	fmt.Println("  --verbose            Show full reasoning steps")
+	fmt.Println("  --quiet              Print only CVE-ID + status per finding")
+	fmt.Println("  --trace              Show the decision trace behind the result")
+	fmt.Println("  --output <fmt>       Output format: human (default), json, jsonl, or sarif")
+	fmt.Println("  -h, --help           Show this help")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  cevrixa detect --product ApacheHTTP --version 2.4.49")
+	fmt.Println("  cevrixa detect --cpe cpe:2.3:a:apache:http_server:2.4.49")
+	fmt.Println("  echo {\"purl\":\"pkg:pypi/django@4.2.0\"} | cevrixa detect -")
 }

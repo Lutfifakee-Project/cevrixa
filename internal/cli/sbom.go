@@ -12,12 +12,13 @@ import (
 )
 
 type sbomFlags struct {
-	Input   string
-	Output  string
-	WithKEV bool
-	FailOn  string
-	DB      string
-	DBSet   bool
+	Input    string
+	Output   string
+	WithKEV  bool
+	FailOn   string
+	DB       string
+	DBSet    bool
+	Snapshot string
 }
 
 func runSBOM(args []string) error {
@@ -34,7 +35,10 @@ func runSBOM(args []string) error {
 		return fmt.Errorf("sbom: %w", err)
 	}
 
-	dbPath := resolveDBPath(flags.DB, flags.DBSet)
+	dbPath, err := resolveStorePath(flags.DB, flags.DBSet, flags.Snapshot)
+	if err != nil {
+		return fmt.Errorf("sbom: %w", err)
+	}
 
 	opts := engine.Options{}
 	if flags.WithKEV {
@@ -45,9 +49,11 @@ func runSBOM(args []string) error {
 		opts.KEV = entries
 	}
 
-	if s, err := openStoreIfDB(dbPath); err != nil {
+	s, err := openStoreIfDB(dbPath)
+	if err != nil {
 		return fmt.Errorf("sbom: %w", err)
-	} else if s != nil {
+	}
+	if s != nil {
 		defer s.Close()
 		opts.Store = s
 	}
@@ -57,6 +63,12 @@ func runSBOM(args []string) error {
 		r, err := engine.Detect(t, opts)
 		if err != nil {
 			return fmt.Errorf("sbom: detect %v: %w", t, err)
+		}
+		r.Dataset.Snapshot = flags.Snapshot
+		if s != nil {
+			if d, derr := s.Digest(); derr == nil {
+				r.Dataset.Digest = d
+			}
 		}
 		reports = append(reports, r)
 	}
@@ -130,11 +142,16 @@ func parseSBOMArgs(args []string) (sbomFlags, error) {
 		case "--db":
 			f.DB = value
 			f.DBSet = true
+		case "--snapshot":
+			f.Snapshot = value
 		default:
 			return f, fmt.Errorf("sbom: unknown flag %q", key)
 		}
 	}
 
+	if f.DBSet && f.Snapshot != "" {
+		return f, errors.New("sbom: use only one of --db or --snapshot")
+	}
 	switch f.Output {
 	case "human", "json", "jsonl", "sarif":
 	default:
@@ -158,6 +175,7 @@ func printSBOMUsage() {
 	fmt.Println("Flags:")
 	fmt.Println("  --with-kev           Enrich findings with CISA KEV data")
 	fmt.Println("  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)")
+	fmt.Println("  --snapshot <name>    Read from a named snapshot instead of the live store")
 	fmt.Println("  --fail-on <level>    Exit non-zero on a matching finding")
 	fmt.Println("  --output <fmt>       Output format: human (default), json, jsonl, or sarif")
 	fmt.Println("  -h, --help           Show this help")
@@ -165,5 +183,5 @@ func printSBOMUsage() {
 	fmt.Println("Examples:")
 	fmt.Println("  cevrixa sbom app.cdx.json")
 	fmt.Println("  cevrixa sbom app.spdx.json")
-	fmt.Println("  cevrixa sbom - < app.cdx.json --output sarif")
+	fmt.Println("  cevrixa sbom app.cdx.json --snapshot 2026-09-30 --output sarif")
 }

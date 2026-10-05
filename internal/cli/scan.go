@@ -15,12 +15,13 @@ import (
 )
 
 type scanFlags struct {
-	Input   string
-	Output  string
-	WithKEV bool
-	FailOn  string
-	DB      string
-	DBSet   bool
+	Input    string
+	Output   string
+	WithKEV  bool
+	FailOn   string
+	DB       string
+	DBSet    bool
+	Snapshot string
 }
 
 func runScan(args []string) error {
@@ -37,7 +38,10 @@ func runScan(args []string) error {
 		return fmt.Errorf("scan: %w", err)
 	}
 
-	dbPath := resolveDBPath(flags.DB, flags.DBSet)
+	dbPath, err := resolveStorePath(flags.DB, flags.DBSet, flags.Snapshot)
+	if err != nil {
+		return fmt.Errorf("scan: %w", err)
+	}
 
 	opts := engine.Options{}
 	if flags.WithKEV {
@@ -48,9 +52,11 @@ func runScan(args []string) error {
 		opts.KEV = entries
 	}
 
-	if s, err := openStoreIfDB(dbPath); err != nil {
+	s, err := openStoreIfDB(dbPath)
+	if err != nil {
 		return fmt.Errorf("scan: %w", err)
-	} else if s != nil {
+	}
+	if s != nil {
 		defer s.Close()
 		opts.Store = s
 	}
@@ -60,6 +66,12 @@ func runScan(args []string) error {
 		r, err := engine.Detect(t, opts)
 		if err != nil {
 			return fmt.Errorf("scan: detect %v: %w", t, err)
+		}
+		r.Dataset.Snapshot = flags.Snapshot
+		if s != nil {
+			if d, derr := s.Digest(); derr == nil {
+				r.Dataset.Digest = d
+			}
 		}
 		reports = append(reports, r)
 	}
@@ -133,11 +145,16 @@ func parseScanArgs(args []string) (scanFlags, error) {
 		case "--db":
 			f.DB = value
 			f.DBSet = true
+		case "--snapshot":
+			f.Snapshot = value
 		default:
 			return f, fmt.Errorf("scan: unknown flag %q", key)
 		}
 	}
 
+	if f.DBSet && f.Snapshot != "" {
+		return f, errors.New("scan: use only one of --db or --snapshot")
+	}
 	switch f.Output {
 	case "human", "json", "jsonl", "sarif":
 	default:
@@ -199,27 +216,24 @@ func readTargets(input string) ([]domain.Target, error) {
 }
 
 func printScanUsage() {
-	fmt.Println(`Usage: cevrixa scan [input] [flags]
-
-Read multiple targets from a file or stdin and detect affected vulnerabilities.
-
-Arguments:
-  input                Path to JSON or JSONL file (default: "-" for stdin)
-
-Flags:
-  --with-kev           Enrich findings with CISA KEV data
-  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
-  --fail-on <level>    Exit non-zero if any finding matches: none, any, affected, inconclusive, kev, or a severity (low, medium, high, critical)
-  --output <fmt>       Output format: human (default), json, jsonl, or sarif
-  -h, --help           Show this help
-
-Input formats:
-  JSON array:          [{"product": "Apache HTTP Server", "version": "2.4.49"}]
-  JSONL:               {"product": "Apache HTTP Server", "version": "2.4.49"}
-                       {"purl": "pkg:pypi/django@4.2.0"}
-
-Examples:
-  echo '[{"product": "Apache HTTP Server", "version": "2.4.49"}]' | cevrixa scan -
-  cevrixa scan targets.json
-  cevrixa scan targets.json --with-kev --db ~/.cevrixa/cevrixa.db`)
+	fmt.Println("Usage: cevrixa scan [input] [flags]")
+	fmt.Println()
+	fmt.Println("Read multiple targets from a file or stdin and detect affected")
+	fmt.Println("vulnerabilities.")
+	fmt.Println()
+	fmt.Println("Arguments:")
+	fmt.Println("  input                Path to JSON or JSONL file (default: - for stdin)")
+	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Println("  --with-kev           Enrich findings with CISA KEV data")
+	fmt.Println("  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)")
+	fmt.Println("  --snapshot <name>    Read from a named snapshot instead of the live store")
+	fmt.Println("  --fail-on <level>    Exit non-zero on a matching finding")
+	fmt.Println("  --output <fmt>       Output format: human (default), json, jsonl, or sarif")
+	fmt.Println("  -h, --help           Show this help")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  cevrixa scan targets.json")
+	fmt.Println("  cevrixa scan targets.json --with-kev")
+	fmt.Println("  cevrixa scan targets.json --snapshot 2026-09-30")
 }
