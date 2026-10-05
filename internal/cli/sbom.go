@@ -29,7 +29,7 @@ func runSBOM(args []string) error {
 		return err
 	}
 
-	targets, err := sbom.ReadCycloneDXFile(flags.Input)
+	targets, err := sbom.ReadAnyFile(flags.Input)
 	if err != nil {
 		return fmt.Errorf("sbom: %w", err)
 	}
@@ -147,23 +147,23 @@ func parseSBOMArgs(args []string) (sbomFlags, error) {
 }
 
 func printSBOMUsage() {
-	fmt.Println(`Usage: cevrixa sbom [input] [flags]
-
-Read a CycloneDX SBOM and detect vulnerabilities for every component
-that carries a PURL.
-
-Arguments:
-  input                Path to CycloneDX JSON (default: "-" for stdin)
-
-Flags:
-  --with-kev           Enrich findings with CISA KEV data
-  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)
-  --fail-on <level>    Exit non-zero if any finding matches: none, any, affected, inconclusive, kev, or a severity (low, medium, high, critical)
-  --output <fmt>       Output format: human (default), json, jsonl, or sarif
-  -h, --help           Show this help
-
-Examples:
-  cevrixa sbom app.cdx.json
-  cevrixa sbom - < app.cdx.json --output sarif
-  cevrixa sbom app.cdx.json --fail-on affected --with-kev`)
+	fmt.Println("Usage: cevrixa sbom [input] [flags]")
+	fmt.Println()
+	fmt.Println("Read an SBOM (CycloneDX or SPDX JSON) and detect vulnerabilities for")
+	fmt.Println("every component that carries a PURL. The format is detected automatically.")
+	fmt.Println()
+	fmt.Println("Arguments:")
+	fmt.Println("  input                Path to an SBOM JSON file (default: - for stdin)")
+	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Println("  --with-kev           Enrich findings with CISA KEV data")
+	fmt.Println("  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)")
+	fmt.Println("  --fail-on <level>    Exit non-zero on a matching finding")
+	fmt.Println("  --output <fmt>       Output format: human (default), json, jsonl, or sarif")
+	fmt.Println("  -h, --help           Show this help")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  cevrixa sbom app.cdx.json")
+	fmt.Println("  cevrixa sbom app.spdx.json")
+	fmt.Println("  cevrixa sbom - < app.cdx.json --output sarif")
 }
