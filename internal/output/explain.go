@@ -53,20 +53,28 @@ type ExplainReport struct {
 	NotEvaluated bool
 	// NotEvaluatedReason explains why no verdict could be produced.
 	NotEvaluatedReason string
+	// IdentityUnresolved reports that the target identity could not be resolved.
+	// It is distinct from a generic inconclusive result: the question was never
+	// answerable because the target could not be identified.
+	IdentityUnresolved bool
 }
 
 type ExplainDecision string
 
 const (
-	ExplainDecisionAffected     ExplainDecision = "affected"
-	ExplainDecisionNotAffected  ExplainDecision = "not_affected"
-	ExplainDecisionInconclusive ExplainDecision = "inconclusive"
+	ExplainDecisionAffected           ExplainDecision = "affected"
+	ExplainDecisionNotAffected        ExplainDecision = "not_affected"
+	ExplainDecisionInconclusive       ExplainDecision = "inconclusive"
+	ExplainDecisionIdentityUnresolved ExplainDecision = "identity_unresolved"
 )
 
 // Decision derives the verdict. Inconclusive is returned whenever Cevrixa did
 // not actually evaluate applicability, so that explain can never print
 // NOT AFFECTED for a question it did not answer.
 func (r ExplainReport) Decision() ExplainDecision {
+	if r.IdentityUnresolved {
+		return ExplainDecisionIdentityUnresolved
+	}
 	if r.NotEvaluated {
 		return ExplainDecisionInconclusive
 	}
@@ -83,6 +91,8 @@ func (d ExplainDecision) Label() string {
 		return "AFFECTED"
 	case ExplainDecisionNotAffected:
 		return "NOT AFFECTED"
+	case ExplainDecisionIdentityUnresolved:
+		return "IDENTITY UNRESOLVED"
 	default:
 		return "INCONCLUSIVE"
 	}
@@ -411,7 +421,9 @@ func (r ExplainReport) why() domain.Why {
 	if len(r.Why.Steps) != 0 {
 		return r.Why
 	}
-	if r.Package != nil {
+	// When the identity was never resolved, there is no CPE to explain. A
+	// synthesized why would only show empty vendor/product placeholders.
+	if r.IdentityUnresolved || r.Package != nil {
 		return domain.Why{}
 	}
 	return matcher.BuildWhy(r.TargetCPE, r.Match)

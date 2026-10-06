@@ -101,6 +101,7 @@ func buildExplainReport(flags explainFlags) (output.ExplainReport, error) {
 		trace.Add("evaluate package applicability", explainTraceStatus(!report.NotEvaluated), packageTraceDetail(report))
 	case target.ResolvedCPE == "":
 		report.NotEvaluated = true
+		report.IdentityUnresolved = true
 		report.NotEvaluatedReason = "target identity could not be resolved to a CPE; pass --cpe or use a product present in the resolver catalog"
 		trace.Add("evaluate applicability", domain.TraceSkipped, report.NotEvaluatedReason)
 	default:
