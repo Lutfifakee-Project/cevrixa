@@ -31,4 +31,8 @@ type Evidence struct {
 	Reference     *Reference         `json:"reference,omitempty"`
 	Range         *PackageRange      `json:"range,omitempty"`
 	Applicability *ApplicabilityNode `json:"applicability,omitempty"`
+
+	// Provenance identifies the source record this evidence came from, when the
+	// source provides a record identifier distinct from the canonical ID.
+	Provenance *Provenance `json:"provenance,omitempty"`
 }

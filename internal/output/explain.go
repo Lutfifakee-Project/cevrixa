@@ -272,6 +272,9 @@ func renderExplainEvidence(w io.Writer, r ExplainReport, opts RenderOptions) {
 				line += " " + v
 			}
 			fmt.Fprintln(w, line)
+			if opts.Verbose && e.Provenance != nil {
+				fmt.Fprintln(w, "            source record: "+e.Provenance.SourceRecordID)
+			}
 			if opts.Verbose && e.Applicability != nil {
 				renderApplicabilityNode(w, e.Applicability, "            ")
 			}

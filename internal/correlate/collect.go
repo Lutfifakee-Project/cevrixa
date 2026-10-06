@@ -16,12 +16,14 @@ func collectVulnEvidence(vulns []domain.Vulnerability) []domain.Evidence {
 
 func vulnEvidence(v domain.Vulnerability) []domain.Evidence {
 	var ev []domain.Evidence
+	prov := provenanceOf(v)
 
 	if v.Status != "" {
 		ev = append(ev, domain.Evidence{
-			Kind:   domain.EvidenceKindStatus,
-			Source: v.Source,
-			Value:  v.Status,
+			Kind:       domain.EvidenceKindStatus,
+			Source:     v.Source,
+			Value:      v.Status,
+			Provenance: prov,
 		})
 	}
 
@@ -30,9 +32,10 @@ func vulnEvidence(v domain.Vulnerability) []domain.Evidence {
 			continue
 		}
 		ev = append(ev, domain.Evidence{
-			Kind:   domain.EvidenceKindAlias,
-			Source: v.Source,
-			Value:  a,
+			Kind:       domain.EvidenceKindAlias,
+			Source:     v.Source,
+			Value:      a,
+			Provenance: prov,
 		})
 	}
 
@@ -46,9 +49,10 @@ func vulnEvidence(v domain.Vulnerability) []domain.Evidence {
 	for i := range v.References {
 		ref := v.References[i]
 		ev = append(ev, domain.Evidence{
-			Kind:      domain.EvidenceKindReference,
-			Source:    v.Source,
-			Reference: &ref,
+			Kind:       domain.EvidenceKindReference,
+			Source:     v.Source,
+			Reference:  &ref,
+			Provenance: prov,
 		})
 	}
 
@@ -58,6 +62,7 @@ func vulnEvidence(v domain.Vulnerability) []domain.Evidence {
 			Kind:          domain.EvidenceKindApplicability,
 			Source:        v.Source,
 			Applicability: &node,
+			Provenance:    prov,
 		})
 	}
 
@@ -65,14 +70,25 @@ func vulnEvidence(v domain.Vulnerability) []domain.Evidence {
 		for i := range pkg.Ranges {
 			r := pkg.Ranges[i]
 			ev = append(ev, domain.Evidence{
-				Kind:   domain.EvidenceKindPackageRange,
-				Source: v.Source,
-				Range:  &r,
+				Kind:       domain.EvidenceKindPackageRange,
+				Source:     v.Source,
+				Range:      &r,
+				Provenance: prov,
 			})
 		}
 	}
 
 	return ev
+}
+
+// provenanceOf returns the source record identity for a vulnerability, when the
+// source provides one distinct from the canonical ID. A record without a
+// source identifier yields no provenance rather than a misleading empty one.
+func provenanceOf(v domain.Vulnerability) *domain.Provenance {
+	if v.Source == "" || v.SourceIdentifier == "" {
+		return nil
+	}
+	return &domain.Provenance{Source: v.Source, SourceRecordID: v.SourceIdentifier}
 }
 
 func collectEnrichmentEvidence(enrichments []domain.Enrichment) []domain.Evidence {

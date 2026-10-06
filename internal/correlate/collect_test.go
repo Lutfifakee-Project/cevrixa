@@ -33,6 +33,22 @@ func TestCollectVulnEvidenceSkipsEmptyAliases(t *testing.T) {
 	}
 }
 
+func TestVulnEvidenceCarriesProvenance(t *testing.T) {
+	v := domain.Vulnerability{ID: "CVE-1", Source: "nvd", SourceIdentifier: "NVD-REC-9", Status: "Analyzed"}
+	ev := vulnEvidence(v)
+	if len(ev) == 0 {
+		t.Fatal("expected evidence")
+	}
+	for _, e := range ev {
+		if e.Provenance == nil {
+			t.Fatalf("evidence %s missing provenance", e.Kind)
+		}
+		if e.Provenance.SourceRecordID != "NVD-REC-9" {
+			t.Fatalf("source record = %q", e.Provenance.SourceRecordID)
+		}
+	}
+}
+
 func TestCollectEnrichmentNoZeroValue(t *testing.T) {
 	e := domain.Enrichment{
 		Source: "example-enricher",

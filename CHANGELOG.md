@@ -35,6 +35,9 @@ Versions follow Semantic Versioning.
 - --fail-on now accepts the report-level gates no_data and identity_unresolved,
   so a CI job can fail when the dataset could not answer or the target could
   not be identified. detect applies them to a single-target report.
+- Evidence now carries provenance: the source record identifier a piece of
+  evidence came from, when the source provides one distinct from the canonical
+  ID. explain --verbose shows it next to each evidence item.
 
 ### Changed
 
