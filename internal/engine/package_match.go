@@ -7,6 +7,22 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/version"
 )
 
+// schemeForPURLType maps a package ecosystem to the version semantics its
+// ecosystem uses. A Debian package carries a revision and possibly an epoch;
+// an rpm package carries a release. Evaluating either with generic semantics
+// can invert the order (2.4.7-1 misread as a pre-release below 2.4.7), so the
+// ecosystem, not the version string alone, selects the parser.
+func schemeForPURLType(purlType string) version.Scheme {
+	switch strings.ToLower(purlType) {
+	case "deb", "debian":
+		return version.SchemeDebian
+	case "rpm", "redhat", "fedora":
+		return version.SchemeRPM
+	default:
+		return version.SchemeGeneric
+	}
+}
+
 type PackageMatchResult struct {
 	Matched  bool
 	Range    string
@@ -33,6 +49,7 @@ func matchPackage(purl domain.PURL, vuln domain.Vulnerability) (PackageMatchResu
 	if ecosystem == "" {
 		return PackageMatchResult{}, false
 	}
+	scheme := schemeForPURLType(purl.Type)
 
 	// A vulnerability may list the same package several times, each entry with
 	// its own ranges (for example django 5.1.x, 5.0.x, and 4.2.x in one
@@ -69,7 +86,7 @@ func matchPackage(purl domain.PURL, vuln domain.Vulnerability) (PackageMatchResu
 		// cannot be compared with the applicable ranges, say so: silently
 		// returning nothing here would report an affected package as clean.
 		if len(pkg.Ranges) > 0 {
-			if _, err := version.ParseLenient(purl.Version); err != nil {
+			if _, err := version.ParseForScheme(purl.Version, scheme); err != nil {
 				if undecided == nil {
 					undecided = &PackageMatchResult{
 						Mode:      "undecided",
@@ -83,7 +100,7 @@ func matchPackage(purl domain.PURL, vuln domain.Vulnerability) (PackageMatchResu
 		}
 
 		for _, r := range pkg.Ranges {
-			res, ok := evalRange(purl, pkg, r)
+			res, ok := evalRange(purl, pkg, r, scheme)
 			if !ok {
 				continue
 			}
@@ -120,7 +137,7 @@ func matchPackage(purl domain.PURL, vuln domain.Vulnerability) (PackageMatchResu
 	return PackageMatchResult{}, false
 }
 
-func evalRange(purl domain.PURL, pkg domain.PackageApplicability, r domain.PackageRange) (PackageMatchResult, bool) {
+func evalRange(purl domain.PURL, pkg domain.PackageApplicability, r domain.PackageRange, scheme version.Scheme) (PackageMatchResult, bool) {
 	// A GIT range compares commit hashes, not versions. A version-numbered
 	// target cannot be evaluated against it, so skip it rather than letting it
 	// make the whole advisory inconclusive.
@@ -128,7 +145,7 @@ func evalRange(purl domain.PURL, pkg domain.PackageApplicability, r domain.Packa
 		return PackageMatchResult{}, false
 	}
 
-	target, err := version.ParseLenient(purl.Version)
+	target, err := version.ParseForScheme(purl.Version, scheme)
 	if err != nil {
 		return PackageMatchResult{}, false
 	}
@@ -142,7 +159,7 @@ func evalRange(purl domain.PURL, pkg domain.PackageApplicability, r domain.Packa
 	hasAttempt := false
 	unparseable := false
 	for _, seg := range segments {
-		res, ok := evalSegment(target, purl, pkg, seg)
+		res, ok := evalSegment(target, purl, pkg, seg, scheme)
 		if !ok {
 			// One segment whose bounds cannot be compared does not invalidate
 			// the others. Skip it; only if every segment fails do we report the
@@ -204,10 +221,10 @@ func buildSegments(events []domain.PackageRangeEvent) []osvSegment {
 	return segments
 }
 
-func evalSegment(target version.Version, purl domain.PURL, pkg domain.PackageApplicability, seg osvSegment) (PackageMatchResult, bool) {
+func evalSegment(target version.Version, purl domain.PURL, pkg domain.PackageApplicability, seg osvSegment, scheme version.Scheme) (PackageMatchResult, bool) {
 	var lower *version.Bound
 	if seg.introduced != "" {
-		v, err := version.ParseLenient(seg.introduced)
+		v, err := version.ParseForScheme(seg.introduced, scheme)
 		if err != nil {
 			return PackageMatchResult{}, false
 		}
@@ -216,13 +233,13 @@ func evalSegment(target version.Version, purl domain.PURL, pkg domain.PackageApp
 
 	var upper *version.Bound
 	if seg.fixed != "" {
-		v, err := version.ParseLenient(seg.fixed)
+		v, err := version.ParseForScheme(seg.fixed, scheme)
 		if err != nil {
 			return PackageMatchResult{}, false
 		}
 		upper = &version.Bound{Version: v, Inclusive: false}
 	} else if seg.lastAffected != "" {
-		v, err := version.ParseLenient(seg.lastAffected)
+		v, err := version.ParseForScheme(seg.lastAffected, scheme)
 		if err != nil {
 			return PackageMatchResult{}, false
 		}
