@@ -22,6 +22,32 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+## [v0.9.1] — 2026-10-06
+
+Version matching fixes found by testing against live NVD and OSV data.
+
+### Detection
+
+- Added PEP 440 pre-release parsing, so versions such as `3.2a1`,
+  `4.1b2`, and `1.10rc1` parse and sort before their plain release.
+  Previously they were rejected, which made the whole advisory uncomparable.
+- Fixed package matching evaluating only the first applicability entry for a
+  package. An advisory that lists the same package several times (for example
+  django 5.1.x, 5.0.x, and 4.2.x in one record) now checks every entry and is
+  affected if any entry matches. Previously the first non-match ended the
+  search, hiding real findings.
+- Fixed a single unparseable segment making a whole range inconclusive. A
+  segment whose bounds cannot be compared is now skipped; the range is
+  inconclusive only when no segment can be evaluated.
+- Skipped `GIT` package ranges when matching a version-numbered target, so a
+  commit-hash range no longer makes an advisory inconclusive.
+
+### Fixed
+
+- Fixed the human output repeating the remediation action, for example
+  `Fix upgrade to 4.2.28 - upgrade to 4.2.28 or later`. The fix line now prints
+  the note alone.
+
 ## [v0.9.0] — 2026-10-06
 
 Researcher experience. explain shows more of the record and its reasoning.
