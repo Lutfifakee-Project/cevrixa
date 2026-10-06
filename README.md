@@ -129,17 +129,24 @@ Decision                affected | not_affected | inconclusive
 Output                  human | JSON | JSONL | SARIF
 ```
 
-A decision is never reduced to true or false:
+A finding is never reduced to true or false, and the report carries its own
+overall decision:
 
-| Status | Meaning |
+| Report decision | Meaning |
 |---|---|
-| `affected` | The evidence indicates the target matches an affected condition. |
-| `not_affected` | The evidence indicates the target does not match an affected condition. |
-| `inconclusive` | The information is insufficient or cannot be evaluated reliably. |
+| `affected` | At least one finding proved the target is affected. |
+| `inconclusive` | A candidate exists but applicability could not be decided reliably. |
+| `no_data` | The target was evaluated but the dataset held no matching candidate. This does not prove the target is safe. |
+| `identity_unresolved` | The target could not be mapped to a reliable identity, so nothing was evaluated. |
 
-An unresolved identity, an unsupported version syntax, or an incomplete
-applicability statement is reported as `inconclusive` with its reason, never as
-a clean result.
+Within a finding, `not_affected` means the applicability question was actually
+evaluated and the target does not satisfy the affected condition. An unresolved
+identity, an unsupported version syntax, or an incomplete applicability
+statement is never reported as a clean result.
+
+`--fail-on` accepts `no_data` and `identity_unresolved` as report-level gates,
+so a CI job can fail when the dataset could not answer or the target could not
+be identified.
 
 A worked example:
 
