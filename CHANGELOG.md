@@ -20,6 +20,25 @@ Categories:
 
 Versions follow Semantic Versioning.
 
+## [v1.0.1] — 2026-10-07
+
+Documentation and repository hygiene. No change to detection behaviour, the
+decision model, or the CLI.
+
+### Fixed
+
+- Restored the wildcard in `.gitignore` patterns: `*.tmp`, `*.log`,
+  `*.db`, and `*:Zone.Identifier` no longer matched, so local scratch files
+  could be committed. The local binary and scratch input are ignored too.
+
+### Changed
+
+- README usage now matches the CLI: `detect` takes flags, the report decision
+  set is `affected`/`inconclusive`/`no_data`/`identity_unresolved`, `sync` is
+  documented, and the deprecated `why`/`why-not`/`sbom` commands are called
+  out.
+- CONTRIBUTING rewritten shorter and clearer.
+
 ## [v1.0.0] — 2026-10-06
 
 Stable release. The detection model, decision model, and CLI are frozen: a
