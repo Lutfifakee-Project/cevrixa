@@ -123,7 +123,7 @@ Version evaluation      boundary comparison
 Evidence + conflicts    cross-source correlation
   |
   v
-Decision                affected | not_affected | inconclusive
+Decision                affected | inconclusive | no_data | identity_unresolved
   |
   v
 Output                  human | JSON | JSONL | SARIF
