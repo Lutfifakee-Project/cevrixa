@@ -89,26 +89,26 @@ func runSync(args []string) error {
 func syncAll(flags syncFlags) error {
 	fmt.Fprintln(os.Stderr, "Cevrixa data update")
 
-	fmt.Fprintln(os.Stderr, "[] Updating CISA KEV...")
+	fmt.Fprintln(os.Stderr, "[*] Updating CISA KEV...")
 	if err := syncKEV(flags.DBPath, flags.Live); err != nil {
 		return err
 	}
 
-	fmt.Fprintln(os.Stderr, "[] Updating NVD...")
+	fmt.Fprintln(os.Stderr, "[*] Updating NVD...")
 	if err := syncNVDRemote(flags.DBPath, flags.Days); err != nil {
 		return err
 	}
 
 	if flags.PURL != "" || flags.PackageName != "" {
-		fmt.Fprintln(os.Stderr, "[] Updating OSV...")
+		fmt.Fprintln(os.Stderr, "[*] Updating OSV...")
 		if err := syncOSVRemote(flags); err != nil {
 			return err
 		}
 	} else {
-		fmt.Fprintln(os.Stderr, "[] OSV skipped (pass --purl or --package to sync OSV)")
+		fmt.Fprintln(os.Stderr, "[*] OSV skipped (pass --purl or --package to sync OSV)")
 	}
 
-	fmt.Fprintln(os.Stderr, "[] Updating EPSS...")
+	fmt.Fprintln(os.Stderr, "[*] Updating EPSS...")
 	if err := syncEPSS(flags.DBPath); err != nil {
 		return err
 	}
@@ -208,9 +208,9 @@ func syncNVDRemote(dbPath string, days int) error {
 	cfg, _ := config.Load()
 	if cfg.NVDAPIKey != "" {
 		client.APIKey = cfg.NVDAPIKey
-		fmt.Fprintln(os.Stderr, "[] NVD: using API key")
+		fmt.Fprintln(os.Stderr, "[*] NVD: using API key")
 	} else {
-		fmt.Fprintln(os.Stderr, "[] NVD: no API key, using public rate limit (~6s between pages)")
+		fmt.Fprintln(os.Stderr, "[*] NVD: no API key, using public rate limit (~6s between pages)")
 	}
 
 	end := time.Now().UTC().Format("2006-01-02T15:04:05.000")
@@ -247,7 +247,7 @@ func syncNVDFull(dbPath string) error {
 		client.APIKey = cfg.NVDAPIKey
 	}
 
-	fmt.Fprintln(os.Stderr, "[] NVD full: fetching full NVD history")
+	fmt.Fprintln(os.Stderr, "[*] NVD full: fetching full NVD history")
 	n, err := syncpkg.BackfillNVD(context.Background(), syncpkg.NVDBackfillOptions{
 		Source:       client,
 		Store:        s,
