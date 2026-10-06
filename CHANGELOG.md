@@ -20,7 +20,13 @@ Categories:
 
 Versions follow Semantic Versioning.
 
-## [Unreleased]
+## [v1.0.0] — 2026-10-06
+
+Stable release. The detection model, decision model, and CLI are frozen: a
+report carries a decision of affected, inconclusive, no_data, or
+identity_unresolved, version semantics are selected per ecosystem, evidence
+records its provenance, and every report states the engine version and dataset
+digest it was computed from.
 
 ### Added
 
