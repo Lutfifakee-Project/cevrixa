@@ -1,6 +1,11 @@
 # Build output
 /bin/
 /dist/
+/cevrixa.exe
+/cevrixa
+
+# Scratch input
+/targets.jsonl
 
 # Agent working notes
 /Codelyxa/
@@ -16,10 +21,10 @@
 # OS metadata
 .DS_Store
 Thumbs.db
-:Zone.Identifier
+*:Zone.Identifier
 
 # Temporary files
-.tmp
-.log
-.db
+*.tmp
+*.log
+*.db
 *.db-journal

@@ -1,65 +1,66 @@
 # Contributing
 
-Thanks for helping improve Cevrixa. This guide is short on purpose.
+Thank you for your interest in contributing to Cevrixa.
 
-## Setup
+Cevrixa is an open-source project focused on evidence-first vulnerability applicability. Contributions that improve accuracy, reliability, usability, documentation, and source coverage are welcome.
 
-Cevrixa needs Go 1.27 or later.
+## Before You Start
 
-bash
-git clone https://github.com/Lutfifakee-Project/cevrixa
-cd cevrixa
-go build ./...
+Before making a change:
 
+- Check existing issues and pull requests.
+- For larger changes, open an issue first to discuss the idea.
+- Keep changes focused and relevant to Cevrixa.
 
-## Before you commit
+## Development
 
-Run the checks and keep them green:
+1. Fork the repository.
+2. Clone your fork.
+3. Create a branch for your change.
+4. Make your changes.
+5. Run the tests.
+6. Open a pull request.
 
-bash
-make check   # gofmt, go vet, tests
+Keep changes small and easy to review whenever possible.
 
+## Pull Requests
 
-If you do not have make, run the same steps directly:
+A good pull request should:
 
-bash
-go run scripts/fmtcheck.go
-go vet ./...
-go test ./... -count=1
+- Clearly describe what changed and why.
+- Include tests for new or changed behavior when applicable.
+- Keep unrelated changes out of the PR.
+- Pass the existing test suite and CI checks.
 
+## Issues
 
-## Commit messages
+When reporting a bug, include:
 
-Use Conventional Commits, imperative mood, lower case, no trailing period:
+- What you expected to happen.
+- What actually happened.
+- Steps to reproduce the issue.
+- Relevant command output or error messages.
 
-text
-<type>: <summary>
+For feature requests, explain the problem the feature would solve and the expected behavior.
 
-<optional body: why this change>
+## Code Style
 
+Follow the existing project structure and Go conventions.
 
-Allowed types:
+Prefer simple, readable, and maintainable code over unnecessary complexity.
 
-| Type | Use for |
-|---|---|
-| feat | a new capability |
-| fix | a defect |
-| perf | a performance or accuracy gain |
-| refactor | a behaviour-preserving restructure |
-| docs | documentation only |
-| test | tests only |
-| build | build, dependencies, release plumbing |
-| ci | CI configuration |
-| chore | anything else |
+## Commit Messages
 
-One commit is one logical change. Do not put a version number in a commit
-message; version numbers belong to tags and releases.
+Use clear and concise commit messages that describe the change.
 
-## Changelog
+Examples:
 
-CHANGELOG.md records what changed and why it matters to a user. Add your
-change under Unreleased, in the section that fits: Added, Changed, Improved,
-Fixed, Security, Detection, Database, Removed, or Breaking.
+```text
+fix resolver version matching
+add OSV source support
+improve detection output
+```
 
-When a release is cut, the Unreleased entries move under the new version and
-the release is tagged.
+## License
+
+By contributing to Cevrixa, you agree that your contributions will be licensed under the same license as the project.
