@@ -125,6 +125,9 @@ func renderDataset(w io.Writer, d domain.DatasetInfo) {
 	if d.Digest != "" {
 		line(w, "    [*] Digest       %s", d.Digest)
 	}
+	if d.EngineVersion != "" {
+		line(w, "    [*] Engine       %s", d.EngineVersion)
+	}
 }
 
 func renderTarget(w io.Writer, t domain.Target) {

@@ -29,6 +29,9 @@ Versions follow Semantic Versioning.
 - A report decision model: affected, inconclusive, no_data, identity_unresolved.
 - --quiet/--verbose for scan; --quiet for detect --sbom.
 - --db for doctor.
+- Every report now records the engine version alongside the dataset digest and
+  snapshot, so a result can be reproduced against the same intelligence state
+  and engine.
 
 ### Changed
 

@@ -13,6 +13,10 @@ type DatasetInfo struct {
 	Sources        []string `json:"sources,omitempty"`
 	Snapshot       string   `json:"snapshot,omitempty"`
 	Digest         string   `json:"digest,omitempty"`
+	// EngineVersion is the Cevrixa version that produced this report. With the
+	// digest and snapshot it makes the result reproducible: same target, same
+	// intelligence state, same engine version, same decision.
+	EngineVersion string `json:"engine_version,omitempty"`
 }
 
 // Total returns the number of records that were searched.

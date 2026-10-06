@@ -71,6 +71,7 @@ func runSBOM(args []string) error {
 			return fmt.Errorf("sbom: detect %v: %w", t, err)
 		}
 		r.Dataset.Snapshot = flags.Snapshot
+		r.Dataset.EngineVersion = Version
 		if s != nil {
 			if d, derr := s.Digest(); derr == nil {
 				r.Dataset.Digest = d
