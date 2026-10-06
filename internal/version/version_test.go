@@ -252,7 +252,8 @@ func TestParseLenientDebianEpochWithLetterSuffix(t *testing.T) {
 }
 
 func TestParseRejectsInvalidComponents(t *testing.T) {
-	for _, s := range []string{"1a2", "1.2.x", "x1.2", "1.2.-1"} {
+	// 1a2 is a valid PEP 440 alpha release now, so it is not in this list.
+	for _, s := range []string{"1.2.x", "x1.2", "1.2.-1"} {
 		if _, err := Parse(s); err == nil {
 			t.Fatalf("Parse(%q) unexpectedly succeeded", s)
 		}

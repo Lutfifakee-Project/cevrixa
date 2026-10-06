@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"strings"
+
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/version"
 )
@@ -32,6 +34,17 @@ func matchPackage(purl domain.PURL, vuln domain.Vulnerability) (PackageMatchResu
 		return PackageMatchResult{}, false
 	}
 
+	// A vulnerability may list the same package several times, each entry with
+	// its own ranges (for example django 5.1.x, 5.0.x, and 4.2.x in one
+	// advisory). Every entry must be evaluated: the target is affected if any
+	// entry matches. A decided match wins; otherwise an undecided entry wins
+	// over a decided non-match.
+	var (
+		undecided    *PackageMatchResult
+		nonMatch     *PackageMatchResult
+		identitySeen bool
+	)
+
 	for _, pkg := range vuln.PackageApplicability {
 		if pkg.Ecosystem != ecosystem {
 			continue
@@ -39,6 +52,7 @@ func matchPackage(purl domain.PURL, vuln domain.Vulnerability) (PackageMatchResu
 		if !matchName(ecosystem, purl.Namespace, purl.Name, pkg.Name) {
 			continue
 		}
+		identitySeen = true
 
 		for _, v := range pkg.Versions {
 			if v == purl.Version {
@@ -56,17 +70,18 @@ func matchPackage(purl domain.PURL, vuln domain.Vulnerability) (PackageMatchResu
 		// returning nothing here would report an affected package as clean.
 		if len(pkg.Ranges) > 0 {
 			if _, err := version.ParseLenient(purl.Version); err != nil {
-				return PackageMatchResult{
-					Mode:      "undecided",
-					Criteria:  "pkg:" + purl.Type + "/" + pkg.Name,
-					Undecided: true,
-					Reason:    "target version " + purl.Version + " cannot be compared with " + ecosystem + " ranges",
-				}, true
+				if undecided == nil {
+					undecided = &PackageMatchResult{
+						Mode:      "undecided",
+						Criteria:  "pkg:" + purl.Type + "/" + pkg.Name,
+						Undecided: true,
+						Reason:    "target version " + purl.Version + " cannot be compared with " + ecosystem + " ranges",
+					}
+				}
+				continue
 			}
 		}
 
-		var lastAttempt PackageMatchResult
-		hasAttempt := false
 		for _, r := range pkg.Ranges {
 			res, ok := evalRange(purl, pkg, r)
 			if !ok {
@@ -75,19 +90,44 @@ func matchPackage(purl domain.PURL, vuln domain.Vulnerability) (PackageMatchResu
 			if res.Matched {
 				return res, true
 			}
-			if !hasAttempt {
-				lastAttempt = res
-				hasAttempt = true
+			if res.Undecided {
+				if undecided == nil {
+					u := res
+					undecided = &u
+				}
+				continue
+			}
+			if nonMatch == nil {
+				nm := res
+				nonMatch = &nm
 			}
 		}
-		if hasAttempt {
-			return lastAttempt, true
-		}
+	}
+
+	if undecided != nil {
+		return *undecided, true
+	}
+	if nonMatch != nil {
+		return *nonMatch, true
+	}
+	if identitySeen {
+		// The package matched by name but carried no evaluable range; treat it
+		// as a decided non-match rather than dropping it silently.
+		return PackageMatchResult{
+			Criteria: "pkg:" + purl.Type + "/" + purl.Name,
+		}, true
 	}
 	return PackageMatchResult{}, false
 }
 
 func evalRange(purl domain.PURL, pkg domain.PackageApplicability, r domain.PackageRange) (PackageMatchResult, bool) {
+	// A GIT range compares commit hashes, not versions. A version-numbered
+	// target cannot be evaluated against it, so skip it rather than letting it
+	// make the whole advisory inconclusive.
+	if strings.EqualFold(r.Type, "GIT") {
+		return PackageMatchResult{}, false
+	}
+
 	target, err := version.ParseLenient(purl.Version)
 	if err != nil {
 		return PackageMatchResult{}, false
@@ -100,17 +140,15 @@ func evalRange(purl domain.PURL, pkg domain.PackageApplicability, r domain.Packa
 
 	var lastAttempt PackageMatchResult
 	hasAttempt := false
+	unparseable := false
 	for _, seg := range segments {
 		res, ok := evalSegment(target, purl, pkg, seg)
 		if !ok {
-			// A range whose bounds cannot be parsed or compared cannot be
-			// evaluated. Report that instead of skipping the package.
-			return PackageMatchResult{
-				Mode:      "undecided",
-				Criteria:  "pkg:" + purl.Type + "/" + pkg.Name,
-				Undecided: true,
-				Reason:    "range bounds for " + pkg.Name + " cannot be compared",
-			}, true
+			// One segment whose bounds cannot be compared does not invalidate
+			// the others. Skip it; only if every segment fails do we report the
+			// range as undecided.
+			unparseable = true
+			continue
 		}
 		hasAttempt = true
 		if res.Matched {
@@ -119,6 +157,14 @@ func evalRange(purl domain.PURL, pkg domain.PackageApplicability, r domain.Packa
 		lastAttempt = res
 	}
 	if !hasAttempt {
+		if unparseable {
+			return PackageMatchResult{
+				Mode:      "undecided",
+				Criteria:  "pkg:" + purl.Type + "/" + pkg.Name,
+				Undecided: true,
+				Reason:    "range bounds for " + pkg.Name + " cannot be compared",
+			}, true
+		}
 		return PackageMatchResult{}, false
 	}
 	return lastAttempt, true

@@ -152,14 +152,16 @@ func renderFinding(w io.Writer, f domain.Finding, opts RenderOptions) {
 		fmt.Fprintf(w, "        [*] Fixed        %s\n", f.FixedVersions[0])
 	}
 	if f.Remediation.Action != "" {
-		line := "        [*] Fix          " + f.Remediation.Action
-		if f.Remediation.FixedVersion != "" {
-			line += " to " + f.Remediation.FixedVersion
+		// The note already reads as an action, so show it alone rather than
+		// repeating the action and version.
+		text := f.Remediation.Note
+		if text == "" {
+			text = f.Remediation.Action
+			if f.Remediation.FixedVersion != "" {
+				text += " to " + f.Remediation.FixedVersion
+			}
 		}
-		if f.Remediation.Note != "" {
-			line += " - " + f.Remediation.Note
-		}
-		fmt.Fprintln(w, line)
+		fmt.Fprintf(w, "        [*] Fix          %s\n", text)
 	}
 	if f.KnownExploited != nil {
 		line := "        [*] KEV          YES"

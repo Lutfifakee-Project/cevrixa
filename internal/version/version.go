@@ -45,6 +45,7 @@ func Parse(input string) (Version, error) {
 		return Version{}, fmt.Errorf("version: missing numeric component")
 	}
 
+	s = normalizePreReleaseSeparators(s)
 	// Ignore build metadata for ordering, consistent with SemVer.
 	if idx := strings.IndexByte(s, '+'); idx >= 0 {
 		s = s[:idx]
