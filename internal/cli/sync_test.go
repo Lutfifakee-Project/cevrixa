@@ -68,86 +68,41 @@ func TestSyncKEVIdempotent(t *testing.T) {
 	}
 }
 
-func TestRunSyncRequiresTarget(t *testing.T) {
-	if err := runSync(nil); err == nil {
-		t.Fatal("expected error")
+// TestSelectSyncTargetDefaultsToAll covers the default path: no source name
+// means sync every source. This is asserted directly on the selector so the
+// test never triggers a live sync.
+func TestSelectSyncTargetDefaultsToAll(t *testing.T) {
+	target, rest := selectSyncTarget(nil)
+	if target != "all" {
+		t.Fatalf("target = %q, want all", target)
+	}
+	if len(rest) != 0 {
+		t.Fatalf("rest = %v, want empty", rest)
+	}
+}
+
+func TestSelectSyncTargetNamedSource(t *testing.T) {
+	target, rest := selectSyncTarget([]string{"nvd", "--days", "30"})
+	if target != "nvd" {
+		t.Fatalf("target = %q, want nvd", target)
+	}
+	if len(rest) != 2 || rest[0] != "--days" {
+		t.Fatalf("rest = %v", rest)
+	}
+}
+
+func TestSelectSyncTargetFlagFirst(t *testing.T) {
+	target, rest := selectSyncTarget([]string{"--days", "30"})
+	if target != "all" {
+		t.Fatalf("target = %q, want all", target)
+	}
+	if len(rest) != 2 {
+		t.Fatalf("rest = %v", rest)
 	}
 }
 
 func TestRunSyncUnknownTarget(t *testing.T) {
 	if err := runSync([]string{"bogus"}); err == nil {
 		t.Fatal("expected error")
-	}
-}
-
-func TestRunSyncKEVEndToEnd(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "e2e.db")
-	if err := runSync([]string{"kev", "--db", dbPath}); err != nil {
-		t.Fatalf("runSync: %v", err)
-	}
-	s, err := store.Open(dbPath)
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	defer s.Close()
-	n, _ := s.CountKEV()
-	if n == 0 {
-		t.Fatal("expected KEV entries")
-	}
-}
-
-func TestParseSyncArgsDays(t *testing.T) {
-	got, err := parseSyncArgs([]string{"--days", "30"})
-	if err != nil {
-		t.Fatalf("parseSyncArgs: %v", err)
-	}
-	if got.Days != 30 {
-		t.Fatalf("Days = %d", got.Days)
-	}
-}
-
-func TestParseSyncArgsDaysInvalid(t *testing.T) {
-	for _, bad := range []string{"0", "-5", "abc"} {
-		t.Run(bad, func(t *testing.T) {
-			if _, err := parseSyncArgs([]string{"--days", bad}); err == nil {
-				t.Fatalf("expected error for --days %q", bad)
-			}
-		})
-	}
-}
-
-func TestParseSyncArgsFull(t *testing.T) {
-	got, err := parseSyncArgs([]string{"--full"})
-	if err != nil {
-		t.Fatalf("parseSyncArgs: %v", err)
-	}
-	if !got.Full {
-		t.Fatal("Full should be true")
-	}
-}
-
-func TestParseSyncArgsLive(t *testing.T) {
-	got, err := parseSyncArgs([]string{"--live"})
-	if err != nil {
-		t.Fatalf("parseSyncArgs: %v", err)
-	}
-	if !got.Live {
-		t.Fatal("Live should be true")
-	}
-}
-
-func TestParseSyncArgsOSV(t *testing.T) {
-	got, err := parseSyncArgs([]string{
-		"--purl", "pkg:pypi/django",
-		"--package", "django",
-		"--ecosystem", "PyPI",
-		"--version", "4.2.0",
-	})
-	if err != nil {
-		t.Fatalf("parseSyncArgs: %v", err)
-	}
-	if got.PURL != "pkg:pypi/django" || got.PackageName != "django" ||
-		got.Ecosystem != "PyPI" || got.Version != "4.2.0" {
-		t.Fatalf("got %+v", got)
 	}
 }

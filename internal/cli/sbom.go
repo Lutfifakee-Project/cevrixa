@@ -21,6 +21,10 @@ type sbomFlags struct {
 	Snapshot string
 }
 
+// runSBOM is kept for compatibility. The canonical way to feed an SBOM into
+// Cevrixa is 'cevrixa detect --sbom <file>'.
+//
+// Deprecated: use 'cevrixa detect --sbom <file>' instead.
 func runSBOM(args []string) error {
 	flags, err := parseSBOMArgs(args)
 	if errors.Is(err, errHelpRequested) {
@@ -29,6 +33,8 @@ func runSBOM(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	warnDeprecated("sbom")
 
 	targets, err := sbom.ReadAnyFile(flags.Input)
 	if err != nil {
@@ -166,6 +172,8 @@ func parseSBOMArgs(args []string) (sbomFlags, error) {
 func printSBOMUsage() {
 	fmt.Println("Usage: cevrixa sbom [input] [flags]")
 	fmt.Println()
+	fmt.Println("Deprecated: prefer 'cevrixa detect --sbom <file>'.")
+	fmt.Println()
 	fmt.Println("Read an SBOM (CycloneDX or SPDX JSON) and detect vulnerabilities for")
 	fmt.Println("every component that carries a PURL. The format is detected automatically.")
 	fmt.Println()
@@ -181,7 +189,6 @@ func printSBOMUsage() {
 	fmt.Println("  -h, --help           Show this help")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  cevrixa sbom app.cdx.json")
-	fmt.Println("  cevrixa sbom app.spdx.json")
-	fmt.Println("  cevrixa sbom app.cdx.json --snapshot 2026-09-30 --output sarif")
+	fmt.Println("  cevrixa detect --sbom app.cdx.json")
+	fmt.Println("  cevrixa sbom app.cdx.json            (deprecated)")
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/engine"
 	"github.com/Lutfifakee-Project/cevrixa/internal/output"
+	"github.com/Lutfifakee-Project/cevrixa/internal/sbom"
 )
 
 var errHelpRequested = errors.New("help requested")
@@ -19,6 +20,7 @@ type detectFlags struct {
 	Version  string
 	CPE      string
 	PURL     string
+	SBOM     string
 	Output   string
 	WithKEV  bool
 	FailOn   string
@@ -26,6 +28,7 @@ type detectFlags struct {
 	DBSet    bool
 	Snapshot string
 	Stdin    bool
+	NoSync   bool
 	Verbose  bool
 	Quiet    bool
 	Trace    bool
@@ -40,6 +43,22 @@ func runDetect(args []string) error {
 		return err
 	}
 
+	dbPath, err := resolveStorePath(flags.DB, flags.DBSet, flags.Snapshot)
+	if err != nil {
+		return fmt.Errorf("detect: %w", err)
+	}
+
+	// A snapshot is a frozen, self-contained dataset; never auto-sync into it.
+	if flags.Snapshot == "" {
+		if err := ensureDataset(dbPath, !flags.NoSync); err != nil {
+			return fmt.Errorf("detect: %w", err)
+		}
+	}
+
+	if flags.SBOM != "" {
+		return detectSBOM(flags, dbPath)
+	}
+
 	target := domain.Target{
 		Product: flags.Product,
 		Version: flags.Version,
@@ -52,11 +71,6 @@ func runDetect(args []string) error {
 			return fmt.Errorf("detect: %w", err)
 		}
 		target = t
-	}
-
-	dbPath, err := resolveStorePath(flags.DB, flags.DBSet, flags.Snapshot)
-	if err != nil {
-		return fmt.Errorf("detect: %w", err)
 	}
 
 	opts := engine.Options{Trace: flags.Trace}
@@ -119,6 +133,84 @@ func runDetect(args []string) error {
 	return nil
 }
 
+// detectSBOM runs detection for every component in an SBOM. It is the
+// canonical way to feed an SBOM into Cevrixa: an SBOM is one input shape,
+// alongside product, CPE, and PURL.
+func detectSBOM(flags detectFlags, dbPath string) error {
+	targets, err := sbom.ReadAnyFile(flags.SBOM)
+	if err != nil {
+		return fmt.Errorf("detect: %w", err)
+	}
+
+	opts := engine.Options{Trace: flags.Trace}
+	if flags.WithKEV {
+		entries, _, err := loadKEV(true, dbPath)
+		if err != nil {
+			return fmt.Errorf("detect: %w", err)
+		}
+		opts.KEV = entries
+	}
+
+	s, err := openStoreIfDB(dbPath)
+	if err != nil {
+		return fmt.Errorf("detect: %w", err)
+	}
+	if s != nil {
+		defer s.Close()
+		opts.Store = s
+	}
+
+	reports := make([]domain.Report, 0, len(targets))
+	for _, t := range targets {
+		r, err := engine.Detect(t, opts)
+		if err != nil {
+			return fmt.Errorf("detect: %v: %w", t, err)
+		}
+		r.Dataset.Snapshot = flags.Snapshot
+		if s != nil {
+			if d, derr := s.Digest(); derr == nil {
+				r.Dataset.Digest = d
+			}
+		}
+		reports = append(reports, r)
+	}
+
+	switch flags.Output {
+	case "", "human":
+		if err := output.RenderScanHumanWithOptions(os.Stdout, reports, output.RenderOptions{
+			Verbose: flags.Verbose,
+			Quiet:   flags.Quiet,
+		}); err != nil {
+			return err
+		}
+	case "json":
+		if err := output.RenderScanJSON(os.Stdout, reports); err != nil {
+			return err
+		}
+	case "jsonl":
+		if err := output.RenderScanJSONL(os.Stdout, reports); err != nil {
+			return err
+		}
+	case "sarif":
+		if err := output.RenderScanSARIF(os.Stdout, reports, Version); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("detect: unsupported --output %q", flags.Output)
+	}
+
+	if flags.FailOn != "" {
+		for _, r := range reports {
+			for _, f := range r.Findings {
+				if f.IsSeverityAtLeast(flags.FailOn) {
+					return fmt.Errorf("detect: fail-on %q triggered by %s", flags.FailOn, f.VulnerabilityID)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // readOneTarget reads a single target JSON object, for "detect -". A JSON
 // object is expected; an array is rejected so that the caller uses scan for
 // multiple targets.
@@ -158,6 +250,10 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 			f.WithKEV = true
 			continue
 		}
+		if arg == "--no-sync" {
+			f.NoSync = true
+			continue
+		}
 		if arg == "--verbose" {
 			f.Verbose = true
 			continue
@@ -189,6 +285,8 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 			f.CPE = value
 		case "--purl":
 			f.PURL = value
+		case "--sbom":
+			f.SBOM = value
 		case "--output":
 			f.Output = value
 		case "--fail-on":
@@ -229,6 +327,9 @@ func validateDetectFlags(f detectFlags) error {
 	if f.PURL != "" {
 		identityCount++
 	}
+	if f.SBOM != "" {
+		identityCount++
+	}
 
 	if f.Stdin {
 		if identityCount != 0 {
@@ -236,11 +337,11 @@ func validateDetectFlags(f detectFlags) error {
 		}
 	} else {
 		if identityCount == 0 {
-			return errors.New("detect: one of --product, --cpe, --purl, or - is required")
+			return errors.New("detect: one of --product, --cpe, --purl, --sbom, or - is required")
 		}
 	}
 	if identityCount > 1 {
-		return errors.New("detect: use only one of --product, --cpe, or --purl")
+		return errors.New("detect: use only one of --product, --cpe, --purl, or --sbom")
 	}
 	if f.Product != "" && f.Version == "" {
 		return errors.New("detect: --product requires --version")
@@ -273,7 +374,9 @@ func printDetectUsage() {
 	fmt.Println("  --version <ver>      Product version")
 	fmt.Println("  --cpe <cpe>          CPE 2.3 identifier")
 	fmt.Println("  --purl <purl>        Package URL (e.g. pkg:pypi/django@4.2.0)")
+	fmt.Println("  --sbom <file>        Detect every component in a CycloneDX or SPDX SBOM")
 	fmt.Println("  --with-kev           Enrich findings with CISA KEV data")
+	fmt.Println("  --no-sync            Never prompt to sync; fail if the dataset is missing")
 	fmt.Println("  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)")
 	fmt.Println("  --snapshot <name>    Read from a named snapshot instead of the live store")
 	fmt.Println("  --fail-on <level>    Exit non-zero on a matching finding")
@@ -282,9 +385,4 @@ func printDetectUsage() {
 	fmt.Println("  --trace              Show the decision trace behind the result")
 	fmt.Println("  --output <fmt>       Output format: human (default), json, jsonl, or sarif")
 	fmt.Println("  -h, --help           Show this help")
-	fmt.Println()
-	fmt.Println("Examples:")
-	fmt.Println("  cevrixa detect --product ApacheHTTP --version 2.4.49")
-	fmt.Println("  cevrixa detect --cpe cpe:2.3:a:apache:http_server:2.4.49")
-	fmt.Println("  echo {\"purl\":\"pkg:pypi/django@4.2.0\"} | cevrixa detect -")
 }

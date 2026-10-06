@@ -32,18 +32,21 @@ type syncFlags struct {
 	Version     string
 }
 
-func runSync(args []string) error {
+// selectSyncTarget separates an optional leading source name from the rest of
+// the arguments. With no source name, the target is "all": the default path for
+// a new user. Advanced users can name one source (nvd, osv, kev, epss).
+func selectSyncTarget(args []string) (target string, rest []string) {
 	if len(args) == 0 {
-		printSyncUsage()
-		return errors.New("sync: target required (kev, nvd, osv, epss, or all)")
+		return "all", args
 	}
+	if args[0] != "-" && args[0][0] != '-' {
+		return args[0], args[1:]
+	}
+	return "all", args
+}
 
-	target := ""
-	rest := args
-	if len(args) > 0 && args[0] != "-" && args[0][0] != '-' {
-		target = args[0]
-		rest = args[1:]
-	}
+func runSync(args []string) error {
+	target, rest := selectSyncTarget(args)
 
 	flags, err := parseSyncArgs(rest)
 	if errors.Is(err, errHelpRequested) {
@@ -84,31 +87,33 @@ func runSync(args []string) error {
 }
 
 func syncAll(flags syncFlags) error {
-	fmt.Fprintln(os.Stderr, "sync all: [1/4] kev")
+	fmt.Fprintln(os.Stderr, "Cevrixa data update")
+
+	fmt.Fprintln(os.Stderr, "[] Updating CISA KEV...")
 	if err := syncKEV(flags.DBPath, flags.Live); err != nil {
 		return err
 	}
 
-	fmt.Fprintln(os.Stderr, "sync all: [2/4] nvd")
+	fmt.Fprintln(os.Stderr, "[] Updating NVD...")
 	if err := syncNVDRemote(flags.DBPath, flags.Days); err != nil {
 		return err
 	}
 
 	if flags.PURL != "" || flags.PackageName != "" {
-		fmt.Fprintln(os.Stderr, "sync all: [3/4] osv")
+		fmt.Fprintln(os.Stderr, "[] Updating OSV...")
 		if err := syncOSVRemote(flags); err != nil {
 			return err
 		}
 	} else {
-		fmt.Fprintln(os.Stderr, "sync all: [3/4] osv skipped (no --purl or --package)")
+		fmt.Fprintln(os.Stderr, "[] OSV skipped (pass --purl or --package to sync OSV)")
 	}
 
-	fmt.Fprintln(os.Stderr, "sync all: [4/4] epss")
+	fmt.Fprintln(os.Stderr, "[] Updating EPSS...")
 	if err := syncEPSS(flags.DBPath); err != nil {
 		return err
 	}
 
-	fmt.Fprintln(os.Stderr, "sync all: done")
+	fmt.Fprintln(os.Stderr, "[+] Dataset ready")
 	return nil
 }
 
@@ -151,7 +156,7 @@ func syncKEV(dbPath string, live bool) error {
 		}
 	}
 	n, _ := s.CountKEV()
-	fmt.Fprintf(os.Stderr, "sync kev: %d entries from %s written\n", n, source)
+	fmt.Fprintln(os.Stderr, "[+] KEV:", n, "entries from", source)
 	return nil
 }
 
@@ -185,7 +190,7 @@ func syncEPSS(dbPath string) error {
 		return fmt.Errorf("sync epss: save: %w", err)
 	}
 	n, _ := s.CountEPSS()
-	fmt.Fprintf(os.Stderr, "sync epss: %d scores written\n", n)
+	fmt.Fprintln(os.Stderr, "[+] EPSS:", n, "scores")
 	return nil
 }
 
@@ -203,9 +208,9 @@ func syncNVDRemote(dbPath string, days int) error {
 	cfg, _ := config.Load()
 	if cfg.NVDAPIKey != "" {
 		client.APIKey = cfg.NVDAPIKey
-		fmt.Fprintln(os.Stderr, "sync nvd: using API key")
+		fmt.Fprintln(os.Stderr, "[] NVD: using API key")
 	} else {
-		fmt.Fprintln(os.Stderr, "sync nvd: no API key, using public rate limit (~6s between pages)")
+		fmt.Fprintln(os.Stderr, "[] NVD: no API key, using public rate limit (~6s between pages)")
 	}
 
 	end := time.Now().UTC().Format("2006-01-02T15:04:05.000")
@@ -222,7 +227,7 @@ func syncNVDRemote(dbPath string, days int) error {
 	if err != nil {
 		return fmt.Errorf("sync nvd: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "sync nvd: %d records written\n", n)
+	fmt.Fprintln(os.Stderr, "[+] NVD:", n, "records")
 	return nil
 }
 
@@ -242,7 +247,7 @@ func syncNVDFull(dbPath string) error {
 		client.APIKey = cfg.NVDAPIKey
 	}
 
-	fmt.Fprintln(os.Stderr, "sync nvd full: fetching full NVD history")
+	fmt.Fprintln(os.Stderr, "[] NVD full: fetching full NVD history")
 	n, err := syncpkg.BackfillNVD(context.Background(), syncpkg.NVDBackfillOptions{
 		Source:       client,
 		Store:        s,
@@ -251,7 +256,7 @@ func syncNVDFull(dbPath string) error {
 	if err != nil {
 		return fmt.Errorf("sync nvd full: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "sync nvd full: %d records written\n", n)
+	fmt.Fprintln(os.Stderr, "[+] NVD full:", n, "records")
 	return nil
 }
 
@@ -278,7 +283,7 @@ func syncOSVRemote(flags syncFlags) error {
 	if err != nil {
 		return fmt.Errorf("sync osv: %w", err)
 	}
-	fmt.Fprintf(os.Stderr, "sync osv: %d records written\n", n)
+	fmt.Fprintln(os.Stderr, "[+] OSV:", n, "records")
 	return nil
 }
 
@@ -343,16 +348,18 @@ func defaultDBPath() (string, error) {
 }
 
 func printSyncUsage() {
-	fmt.Println("Usage: cevrixa sync <target> [flags]")
+	fmt.Println("Usage: cevrixa sync [target] [flags]")
 	fmt.Println()
 	fmt.Println("Download and persist vulnerability data to the local SQLite store.")
+	fmt.Println("With no target, sync updates every supported source. Naming a")
+	fmt.Println("single source is an advanced option for automation or troubleshooting.")
 	fmt.Println()
-	fmt.Println("Targets:")
-	fmt.Println("  kev                  Sync CISA Known Exploited Vulnerabilities")
+	fmt.Println("Targets (advanced):")
 	fmt.Println("  nvd                  Sync recent CVE records from NVD API 2.0")
 	fmt.Println("  osv                  Sync OSV vulnerabilities for a package/PURL")
+	fmt.Println("  kev                  Sync CISA Known Exploited Vulnerabilities")
 	fmt.Println("  epss                 Sync FIRST.org EPSS scores")
-	fmt.Println("  all                  Sync all available targets")
+	fmt.Println("  all                  Sync all available targets (default)")
 	fmt.Println()
 	fmt.Println("Flags:")
 	fmt.Println("  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db)")
@@ -366,9 +373,7 @@ func printSyncUsage() {
 	fmt.Println("  -h, --help           Show this help")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  cevrixa sync kev --live")
+	fmt.Println("  cevrixa sync")
 	fmt.Println("  cevrixa sync nvd --days 30")
 	fmt.Println("  cevrixa sync osv --purl pkg:pypi/django")
-	fmt.Println("  cevrixa sync epss")
-	fmt.Println("  cevrixa sync all --days 7")
 }

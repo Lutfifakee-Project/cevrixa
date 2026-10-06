@@ -9,11 +9,26 @@ import (
 )
 
 func runDoctor(args []string) error {
-	for _, a := range args {
-		if a == "-h" || a == "--help" {
-			fmt.Println("Usage: cevrixa doctor\n\nRun environment and data health checks.")
+	dbPath := ""
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		if arg == "-h" || arg == "--help" {
+			fmt.Println("Usage: cevrixa doctor [--db <path>]")
+			fmt.Println()
+			fmt.Println("Run environment and data health checks.")
 			return nil
 		}
+		if arg == "--db" {
+			if i+1 >= len(args) {
+				return fmt.Errorf("doctor: --db requires a value")
+			}
+			dbPath = args[i+1]
+			i++
+			continue
+		}
+		return fmt.Errorf("doctor: unknown argument %q", arg)
 	}
 
 	fmt.Println("Cevrixa Doctor")
@@ -23,10 +38,8 @@ func runDoctor(args []string) error {
 	warn := func(msg string) { fmt.Printf("[WARN] %s\n", msg) }
 	fail := func(msg string) { fmt.Printf("[FAIL] %s\n", msg) }
 
-	// 1. Go version
 	pass(fmt.Sprintf("Go runtime: %s", runtime.Version()))
 
-	// 2. Embedded fixtures
 	n := engine.EmbeddedFixtureCount()
 	if n > 0 {
 		pass(fmt.Sprintf("Embedded fixtures: %d records", n))
@@ -34,7 +47,6 @@ func runDoctor(args []string) error {
 		fail("Embedded fixtures: none loaded")
 	}
 
-	// 3. Catalog
 	cat := resolver.CatalogSize()
 	if cat >= 30 {
 		pass(fmt.Sprintf("Product catalog: %d products", cat))
@@ -44,11 +56,15 @@ func runDoctor(args []string) error {
 		fail("Product catalog: empty")
 	}
 
-	// 4. Store
-	dbPath, err := defaultDBPath()
-	if err != nil {
-		warn(fmt.Sprintf("Default store path: %v", err))
-	} else {
+	if dbPath == "" {
+		p, err := defaultDBPath()
+		if err != nil {
+			warn(fmt.Sprintf("Default store path: %v", err))
+		} else {
+			dbPath = p
+		}
+	}
+	if dbPath != "" {
 		if s, err := openStoreIfDB(dbPath); err == nil && s != nil {
 			defer s.Close()
 			v, _ := s.CountVulnerabilities()
@@ -58,8 +74,6 @@ func runDoctor(args []string) error {
 			if v == 0 {
 				warn("Store is empty — run 'cevrixa sync nvd --days 30'")
 			} else if cov, err := s.ApplicabilityCoverage(); err == nil {
-				// A record count says nothing about whether the records can be
-				// matched. Report the gap instead of implying the store is healthy.
 				switch {
 				case cov.Unmatchable == 0:
 					pass(fmt.Sprintf("Store applicability: all %d records carry matchable criteria", cov.Total))
@@ -68,8 +82,8 @@ func runDoctor(args []string) error {
 						"Store applicability: %d of %d records carry no matchable criteria (%d with CPE, %d package-only)",
 						cov.Unmatchable, cov.Total, cov.WithCPE, cov.WithPackage,
 					))
-					fmt.Printf("       Those records cannot match any target. Re-sync to repair:\n")
-					fmt.Printf("       cevrixa sync nvd --days 120   (or --full)\n")
+					fmt.Println("       Those records cannot match any target. Re-sync to repair:")
+					fmt.Println("       cevrixa sync nvd --days 120   (or --full)")
 				}
 			}
 		} else {
@@ -77,7 +91,6 @@ func runDoctor(args []string) error {
 		}
 	}
 
-	// 5. Config
 	if _, err := loadConfigIfPresent(); err != nil {
 		warn(fmt.Sprintf("Config: %v", err))
 	} else {

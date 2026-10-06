@@ -12,6 +12,8 @@ import (
 // path as explain; when the target is not affected it says so rather than
 // inventing a reason. The exit status stays zero: an unfulfilled question is an
 // answer, not an error.
+//
+// Deprecated: use 'cevrixa explain' instead. Kept working for compatibility.
 func runWhy(args []string) error {
 	flags, err := parseTargetArgs(args, "why")
 	if errors.Is(err, errHelpRequested) {
@@ -20,6 +22,8 @@ func runWhy(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	warnDeprecated("why")
 
 	report, err := buildExplainReport(flags)
 	if err != nil {
@@ -35,6 +39,8 @@ func runWhy(args []string) error {
 // runWhyNot answers "why is this target not affected". It uses the same
 // reasoning path as explain; when the target is affected it says so rather
 // than inventing a reason.
+//
+// Deprecated: use 'cevrixa explain' instead. Kept working for compatibility.
 func runWhyNot(args []string) error {
 	flags, err := parseTargetArgs(args, "why-not")
 	if errors.Is(err, errHelpRequested) {
@@ -43,6 +49,8 @@ func runWhyNot(args []string) error {
 	if err != nil {
 		return err
 	}
+
+	warnDeprecated("why-not")
 
 	report, err := buildExplainReport(flags)
 	if err != nil {
@@ -68,9 +76,9 @@ func renderWhyReport(w *os.File, report output.ExplainReport, flags explainFlags
 func renderWhyMismatch(w *os.File, report output.ExplainReport, wantAffected bool) error {
 	real := string(report.Decision())
 	if wantAffected {
-		fmt.Fprintf(w, "this target is %s, not affected; there is no 'why it is affected' to give.\n", real)
+		fmt.Fprintf(w, "this target is %s, not affected; there is no 'why it is affected' to give.", real)
 	} else {
-		fmt.Fprintf(w, "this target is %s, not 'not affected'; there is no 'why it is not affected' to give.\n", real)
+		fmt.Fprintf(w, "this target is %s, not 'not affected'; there is no 'why it is not affected' to give.", real)
 	}
 	fmt.Fprintln(w)
 	return output.RenderExplainHumanWithOptions(w, report, output.RenderOptions{})

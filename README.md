@@ -13,11 +13,11 @@
 
 </p>
 
-## Overview
+## What Cevrixa does
 
 Cevrixa is a vulnerability applicability engine. Given a product, package, or
-system component, it determines whether that *exact version* is affected by
-known vulnerabilities, and returns the evidence behind the decision.
+component, it determines whether that exact version is affected by known
+vulnerabilities, and returns the evidence behind the decision.
 
 A list of CVEs for a product name is easy to produce and hard to act on.
 Cevrixa answers the narrower question: is this version affected, on what
@@ -29,121 +29,69 @@ name. A question Cevrixa cannot answer is reported as `inconclusive`, never as
 
 Cevrixa is not a network scanner, an exploit framework, or a CVE lookup wrapper.
 
-## Features
-
-**Detection**
-
-- Product resolution from a name to a CPE identifier
-- CPE matching, including `AND` / `OR` configuration nodes, negated nodes,
-  and `vulnerable: false` requirements
-- PURL and package identity across PyPI, npm, Go, Maven, Debian, Alpine, RPM
-- Version comparison: numeric core, pre-release identifiers, post-release
-  suffixes, epoch and revision prefixes
-- Affected-version evaluation for CPE criteria and package ranges
-  (`introduced`, `fixed`, `last_affected`)
-- Fixed-version detection
-- Status: `affected`, `not_affected`, `inconclusive`
-- Confidence: `exact`, `strong`, `moderate`, `weak`
-- Explainable findings: identity, range, evidence, and reasoning steps
-- Cross-source conflict reporting for severity, CVSS, KEV, and status
-- Decision trace: the ordered reasoning path behind a verdict
-- Dataset coverage on every report
-
-**Data**
-
-- NVD (API 2.0), OSV, and CISA KEV sources
-- Local SQLite store with incremental `sync`
-- Detection runs against the local dataset, with no network access
-
-**Interfaces**
-
-- Human, JSON, JSONL, and SARIF output
-- Single-target `detect`, multi-target `scan`, and CycloneDX `sbom` input
-- `explain`, `why`, and `why-not` for a specific vulnerability
-- CI gates through `--fail-on`
-
 ## Installation
 
-Requires Go 1.27 or newer.
+Cevrixa requires Go 1.27 or later.
+
+Install with:
 
 ```bash
-git clone https://github.com/Lutfifakee-Project/cevrixa
-cd cevrixa
-make build
+go install github.com/Lutfifakee-Project/cevrixa/cmd/cevrixa@latest
 ```
 
-The binary is written to `bin/cevrixa`. Prebuilt binaries are published for
-Linux, macOS, and Windows on `amd64` and `arm64`. To cross-compile every
-target from any host:
+Verify the installation:
 
 ```bash
-make build-all
+cevrixa -h
 ```
 
-Fetch vulnerability data before detecting:
+> If `cevrixa` is not found, add your Go bin directory to your `PATH`.
+> Run `go env GOPATH` (the binary lives in its bin dir), or `go env GOBIN` if set.
 
-```bash
-./bin/cevrixa sync kev --live
-./bin/cevrixa sync nvd --days 30
-```
+## Quick start
 
-## Usage
-
-Detect a single target:
+Detect a product version:
 
 ```bash
 cevrixa detect --product "Apache HTTP Server" --version 2.4.49
-cevrixa detect --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
-cevrixa detect --purl "pkg:pypi/django@4.2.0" --output json
 ```
 
-Explain a specific vulnerability, and ask why or why-not:
+Detect a package:
+
+```bash
+cevrixa detect --purl "pkg:pypi/django@4.2.0"
+```
+
+Detect an SBOM:
+
+```bash
+cevrixa detect --sbom app.cdx.json
+```
+
+Explain a result:
 
 ```bash
 cevrixa explain CVE-2021-41773 --product "Apache HTTP Server" --version 2.4.49
-cevrixa why CVE-2021-41773 --cpe "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"
-cevrixa why-not CVE-2021-41773 --cpe "cpe:2.3:a:apache:http_server:2.4.51:*:*:*:*:*:*:*"
 ```
 
-Show the decision trace behind a result:
+Update vulnerability data:
 
 ```bash
-cevrixa detect --product "Apache HTTP Server" --version 2.4.49 --trace
+cevrixa sync
 ```
 
-Scan many targets, or every component of a CycloneDX SBOM:
+Cevrixa automatically offers to sync vulnerability data when no local dataset
+is available. Use `--no-sync` for non-interactive and CI environments.
 
-```bash
-cevrixa scan targets.json
-cat targets.jsonl | cevrixa scan -
-cevrixa sbom app.cdx.json --output sarif
-```
+That is enough to get started. To see everything else, run `cevrixa -h` or
+`cevrixa detect -h`.
 
-Synchronise vulnerability data:
-
-```bash
-cevrixa sync kev --live
-cevrixa sync nvd --days 30
-cevrixa sync osv --purl pkg:pypi/django
-```
-
-Common flags:
-
-| Flag | Applies to | Meaning |
-|---|---|---|
-| `--db <path>` | most commands | Local database (default `~/.cevrixa/cevrixa.db`) |
-| `--output <fmt>` | detect, scan, sbom | `human`, `json`, `jsonl`, `sarif` |
-| `--fail-on <gate>` | detect, scan, sbom | `none`, `any`, `affected`, `inconclusive`, `kev`, or a severity |
-| `--with-kev` | detect, scan, sbom | Enrich findings with CISA KEV data |
-| `--trace` | detect | Show the decision trace |
-| `--verbose` / `--quiet` | detect, explain | Full reasoning / identifier only |
-
-## How It Works
+## How it works
 
 The detection pipeline turns an input into an evidence-backed decision:
 
 ```text
-Input  (product + version | CPE | PURL | CycloneDX | stdin)
+Input  (product + version | CPE | PURL | SBOM | stdin)
   |
   v
 Resolve identity        product -> CPE; PURL -> package identity
@@ -194,18 +142,13 @@ A worked example:
         [*] Fixed        2.4.51
 ```
 
-When the answer cannot be determined, Cevrixa says so:
+Show the decision trace behind a result:
 
-```text
- cevrixa explain CVE-2008-4128 --cpe "cpe:2.3:o:cisco:ios:12.4:*:*:*:*:*:*:*"
-
-    [+] Decision
-        [*] Status       INCONCLUSIVE
-        [!] No verdict was produced: AND configuration requires an additional
-            component that is not the target
+```bash
+cevrixa detect --product "Apache HTTP Server" --version 2.4.49 --trace
 ```
 
-## Supported Sources
+## Supported sources
 
 | Source | Provides |
 | --- | --- |

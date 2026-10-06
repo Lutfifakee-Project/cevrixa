@@ -46,22 +46,25 @@ func Run(args []string) error {
 }
 
 func printUsage() {
-	fmt.Println(`Usage:
-  cevrixa <command> [flags]
-
-Commands:
-  detect     Detect whether a single target is affected
-  scan       Read multiple targets from a file or stdin
-  sbom       Read a CycloneDX SBOM and detect affected components
-  sync       Download and persist vulnerability data to local store
-  explain    Explain why a vulnerability applies or not
-  why        Answer why a target is affected
-  why-not    Answer why a target is not affected
-  snapshot   Create and list frozen intelligence snapshots
-  info       Show environment and data status
-  doctor     Run environment and data health checks
-  version    Print version information
-  help       Show this help message
-
-Run 'cevrixa <command> --help' for more information on a command.`)
+	fmt.Println("Usage:")
+	fmt.Println("  cevrixa <command> [flags]")
+	fmt.Println()
+	fmt.Println("Primary:")
+	fmt.Println("  detect     Detect whether a target is affected (product, CPE, PURL, or SBOM)")
+	fmt.Println("  explain    Explain why a vulnerability does or does not apply")
+	fmt.Println()
+	fmt.Println("Bulk and data:")
+	fmt.Println("  scan       Read multiple targets from a file or stdin")
+	fmt.Println("  sync       Sync vulnerability data (default: all sources)")
+	fmt.Println()
+	fmt.Println("Diagnostics:")
+	fmt.Println("  doctor     Run environment and data health checks")
+	fmt.Println("  info       Show environment and data status")
+	fmt.Println("  version    Print version information")
+	fmt.Println()
+	fmt.Println("Advanced:")
+	fmt.Println("  snapshot   Create and list frozen intelligence snapshots")
+	fmt.Println("  sbom       Deprecated: use 'cevrixa detect --sbom <file>'")
+	fmt.Println()
+	fmt.Println("Run 'cevrixa <command> --help' for more information on a command.")
 }

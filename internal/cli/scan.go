@@ -22,6 +22,8 @@ type scanFlags struct {
 	DB       string
 	DBSet    bool
 	Snapshot string
+	Verbose  bool
+	Quiet    bool
 }
 
 func runScan(args []string) error {
@@ -78,7 +80,10 @@ func runScan(args []string) error {
 
 	switch flags.Output {
 	case "", "human":
-		if err := output.RenderScanHuman(os.Stdout, reports); err != nil {
+		if err := output.RenderScanHumanWithOptions(os.Stdout, reports, output.RenderOptions{
+			Verbose: flags.Verbose,
+			Quiet:   flags.Quiet,
+		}); err != nil {
 			return err
 		}
 	case "json":
@@ -125,6 +130,14 @@ func parseScanArgs(args []string) (scanFlags, error) {
 		}
 		if arg == "--with-kev" {
 			f.WithKEV = true
+			continue
+		}
+		if arg == "--verbose" {
+			f.Verbose = true
+			continue
+		}
+		if arg == "--quiet" {
+			f.Quiet = true
 			continue
 		}
 
@@ -229,6 +242,8 @@ func printScanUsage() {
 	fmt.Println("  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)")
 	fmt.Println("  --snapshot <name>    Read from a named snapshot instead of the live store")
 	fmt.Println("  --fail-on <level>    Exit non-zero on a matching finding")
+	fmt.Println("  --verbose            Show full reasoning steps")
+	fmt.Println("  --quiet              Print only CVE-ID + status per finding")
 	fmt.Println("  --output <fmt>       Output format: human (default), json, jsonl, or sarif")
 	fmt.Println("  -h, --help           Show this help")
 	fmt.Println()
