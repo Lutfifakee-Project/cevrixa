@@ -130,6 +130,9 @@ func runDetect(args []string) error {
 				return fmt.Errorf("detect: fail-on %q triggered by %s", flags.FailOn, f.VulnerabilityID)
 			}
 		}
+		if err := reportGateFails("detect", flags.FailOn, report.Decision); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -381,7 +384,8 @@ func printDetectUsage() {
 	fmt.Println("  --no-sync            Never prompt to sync; fail if the dataset is missing")
 	fmt.Println("  --db <path>          SQLite database (default: ~/.cevrixa/cevrixa.db if exists)")
 	fmt.Println("  --snapshot <name>    Read from a named snapshot instead of the live store")
-	fmt.Println("  --fail-on <level>    Exit non-zero on a matching finding")
+	fmt.Println("  --fail-on <level>    Exit non-zero on a matching finding; report-level gates:")
+	fmt.Println("                       no_data, identity_unresolved")
 	fmt.Println("  --verbose            Show full reasoning steps")
 	fmt.Println("  --quiet              Print only CVE-ID + status per finding")
 	fmt.Println("  --trace              Show the decision trace behind the result")

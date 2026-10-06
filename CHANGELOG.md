@@ -32,6 +32,9 @@ Versions follow Semantic Versioning.
 - Every report now records the engine version alongside the dataset digest and
   snapshot, so a result can be reproduced against the same intelligence state
   and engine.
+- --fail-on now accepts the report-level gates no_data and identity_unresolved,
+  so a CI job can fail when the dataset could not answer or the target could
+  not be identified. detect applies them to a single-target report.
 
 ### Changed
 

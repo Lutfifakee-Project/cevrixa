@@ -101,7 +101,7 @@ func CanonicalSeverity(value string) string {
 // loudly instead of silently disabling the gate.
 func ValidGate(gate string) bool {
 	switch strings.ToLower(strings.TrimSpace(gate)) {
-	case "", "none", "any", "affected", "inconclusive", "kev":
+	case "", "none", "any", "affected", "inconclusive", "kev", "no_data", "identity_unresolved":
 		return true
 	}
 	_, ok := severityRank[CanonicalSeverity(gate)]

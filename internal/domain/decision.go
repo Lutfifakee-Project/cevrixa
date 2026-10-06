@@ -1,5 +1,7 @@
 package domain
 
+import "strings"
+
 // ReportDecision is the overall verdict of a detection report.
 //
 // It exists so that "no findings" can never be confused with "not affected".
@@ -47,4 +49,20 @@ func DecisionFor(identityResolved bool, findings []Finding) ReportDecision {
 		return DecisionInconclusive
 	}
 	return DecisionNoData
+}
+
+// ReportSatisfiesGate reports whether a report decision triggers the given
+// --fail-on gate. It complements the per-finding gates: no_data and
+// identity_unresolved are properties of the whole report, not of a finding, so
+// a CI job can fail when the dataset could not answer or the target could not
+// be identified.
+func ReportSatisfiesGate(gate string, decision ReportDecision) bool {
+	switch strings.ToLower(strings.TrimSpace(gate)) {
+	case "no_data":
+		return decision == DecisionNoData
+	case "identity_unresolved":
+		return decision == DecisionIdentityUnresolved
+	default:
+		return false
+	}
 }

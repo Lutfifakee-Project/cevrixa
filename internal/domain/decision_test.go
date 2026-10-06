@@ -37,3 +37,22 @@ func TestDecisionForResolvedNotAffectedIsNoData(t *testing.T) {
 		t.Fatalf("decision = %q, want no_data", got)
 	}
 }
+
+func TestReportSatisfiesGate(t *testing.T) {
+	cases := []struct {
+		gate     string
+		decision ReportDecision
+		want     bool
+	}{
+		{"no_data", DecisionNoData, true},
+		{"no_data", DecisionAffected, false},
+		{"identity_unresolved", DecisionIdentityUnresolved, true},
+		{"identity_unresolved", DecisionNoData, false},
+		{"affected", DecisionAffected, false},
+	}
+	for _, c := range cases {
+		if got := ReportSatisfiesGate(c.gate, c.decision); got != c.want {
+			t.Fatalf("ReportSatisfiesGate(%q, %q) = %v, want %v", c.gate, c.decision, got, c.want)
+		}
+	}
+}
