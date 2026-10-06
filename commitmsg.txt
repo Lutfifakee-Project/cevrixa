@@ -1,8 +1,0 @@
-docs: trim contribution guide and drop internal notes
-
-The repository keeps only what a user needs: README, CHANGELOG, LICENSE, and
-CONTRIBUTING. The internal design notes and working roadmap are removed from
-the tree, and .gitignore is reduced to the paths that are still relevant.
-
-CONTRIBUTING is rewritten short and clear: setup, the checks to keep green, the
-commit convention, and the changelog rule.
