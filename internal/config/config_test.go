@@ -11,9 +11,6 @@ func TestDefault(t *testing.T) {
 	if cfg.LogLevel != "info" {
 		t.Fatalf("LogLevel = %q, want info", cfg.LogLevel)
 	}
-	if cfg.DefaultOutput != "human" {
-		t.Fatalf("DefaultOutput = %q, want human", cfg.DefaultOutput)
-	}
 }
 
 func TestLoadMissingFile(t *testing.T) {
@@ -49,9 +46,6 @@ func TestLoadValidFile(t *testing.T) {
 	}
 	if cfg.LogLevel != "debug" {
 		t.Fatalf("LogLevel = %q", cfg.LogLevel)
-	}
-	if cfg.DefaultOutput != "json" {
-		t.Fatalf("DefaultOutput = %q", cfg.DefaultOutput)
 	}
 	if cfg.NVDAPIKey != "test-key" {
 		t.Fatalf("NVDAPIKey = %q", cfg.NVDAPIKey)

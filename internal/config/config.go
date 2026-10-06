@@ -8,15 +8,13 @@ import (
 )
 
 type Config struct {
-	NVDAPIKey     string `json:"nvd_api_key,omitempty"`
-	LogLevel      string `json:"log_level,omitempty"`
-	DefaultOutput string `json:"default_output,omitempty"`
+	NVDAPIKey string `json:"nvd_api_key,omitempty"`
+	LogLevel  string `json:"log_level,omitempty"`
 }
 
 func Default() Config {
 	return Config{
-		LogLevel:      "info",
-		DefaultOutput: "human",
+		LogLevel: "info",
 	}
 }
 
@@ -44,9 +42,6 @@ func Load() (Config, error) {
 	}
 	if fileCfg.LogLevel != "" {
 		cfg.LogLevel = fileCfg.LogLevel
-	}
-	if fileCfg.DefaultOutput != "" {
-		cfg.DefaultOutput = fileCfg.DefaultOutput
 	}
 	if fileCfg.NVDAPIKey != "" {
 		cfg.NVDAPIKey = fileCfg.NVDAPIKey
