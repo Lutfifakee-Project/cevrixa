@@ -43,6 +43,7 @@ func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 	report := domain.Report{Target: target, Findings: []domain.Finding{}, Dataset: dataset}
 	if target.ResolvedCPE == "" {
 		trace.Add("evaluate applicability", domain.TraceSkipped, "identity was not resolved, so no applicability was evaluated")
+		report.Decision = domain.DecisionIdentityUnresolved
 		report.Trace = traceIf(opts, trace)
 		return report, nil
 	}
@@ -76,6 +77,7 @@ func detectByCPE(target domain.Target, opts Options) (domain.Report, error) {
 		findings = append(findings, f)
 	}
 	report.Findings = findings
+	report.Decision = domain.DecisionFor(true, findings)
 	trace.Add("evaluate applicability", domain.TraceOK,
 		fmt.Sprintf("matched %d, inconclusive %d, not affected %d", matched, undecided, len(vulns)-matched-undecided))
 	trace.Add("decide", traceStatus(matched > 0), decideDetail(matched, undecided, len(findings)))
@@ -132,7 +134,13 @@ func detectByPURL(target domain.Target, opts Options) (domain.Report, error) {
 		fmt.Sprintf("matched %d, inconclusive %d", matched, undecided))
 	trace.Add("decide", traceStatus(matched > 0), decideDetail(matched, undecided, len(findings)))
 
-	return domain.Report{Target: target, Findings: findings, Dataset: dataset, Trace: traceIf(opts, trace)}, nil
+	return domain.Report{
+		Target:   target,
+		Findings: findings,
+		Dataset:  dataset,
+		Decision: domain.DecisionFor(true, findings),
+		Trace:    traceIf(opts, trace),
+	}, nil
 }
 
 // traceIf returns the trace only when the caller asked for one, so a normal

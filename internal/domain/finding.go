@@ -61,6 +61,10 @@ type Report struct {
 	Target   Target      `json:"target"`
 	Findings []Finding   `json:"findings"`
 	Dataset  DatasetInfo `json:"dataset"`
+	// Decision is the overall verdict of the report. It distinguishes "no data"
+	// and "identity unresolved" from "not affected", so an absence of findings
+	// is never read as proof that the target is safe.
+	Decision ReportDecision `json:"decision"`
 	// Trace records the reasoning path behind this report's decision. It is
 	// populated when the caller asked for it, and omitted otherwise.
 	Trace Trace `json:"trace,omitzero"`

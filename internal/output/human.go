@@ -14,6 +14,14 @@ type RenderOptions struct {
 	Quiet   bool
 }
 
+// line prints one formatted line, then a newline. Using this instead of an
+// explicit newline escape in every format string keeps the renderers readable
+// and keeps the text identical across platforms.
+func line(w io.Writer, format string, a ...any) {
+	fmt.Fprintf(w, format, a...)
+	fmt.Fprintln(w)
+}
+
 func RenderHuman(w io.Writer, r domain.Report) error {
 	return RenderHumanWithOptions(w, r, RenderOptions{})
 }
@@ -25,13 +33,11 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 
 	renderTarget(w, r.Target)
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "[*] Findings: %d\n", len(r.Findings))
+	line(w, "[*] Findings: %d", len(r.Findings))
 	renderDataset(w, r.Dataset)
 
 	if len(r.Findings) == 0 {
-		fmt.Fprintln(w)
-		fmt.Fprintln(w, "    [!] No matching vulnerabilities found in the current local dataset.")
-		fmt.Fprintln(w, "        This does NOT prove the target is not affected.")
+		renderEmptyDecision(w, r)
 		renderTrace(w, r.Trace)
 		return nil
 	}
@@ -46,6 +52,24 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 	return nil
 }
 
+// renderEmptyDecision states the report decision when there are no findings.
+// An unresolved identity and a searched-but-empty dataset are different
+// answers, and neither is "not affected", so they must never look the same.
+func renderEmptyDecision(w io.Writer, r domain.Report) {
+	fmt.Fprintln(w)
+	switch r.Decision {
+	case domain.DecisionIdentityUnresolved:
+		fmt.Fprintln(w, "    [!] IDENTITY UNRESOLVED")
+		fmt.Fprintln(w, "        The target identity could not be resolved, so no")
+		fmt.Fprintln(w, "        applicability was evaluated. This is not a clean result.")
+		fmt.Fprintln(w, "        Provide --cpe, or a product present in the resolver catalog.")
+	default:
+		fmt.Fprintln(w, "    [!] NO DATA")
+		fmt.Fprintln(w, "        No matching vulnerabilities found in the current dataset.")
+		fmt.Fprintln(w, "        This does NOT prove the target is not affected.")
+	}
+}
+
 // renderTrace prints the reasoning path behind a decision, so a reader can see
 // how the verdict was reached and not only its result.
 func renderTrace(w io.Writer, t domain.Trace) {
@@ -56,11 +80,11 @@ func renderTrace(w io.Writer, t domain.Trace) {
 	fmt.Fprintln(w, "[+] Decision Trace")
 	for i, s := range t.Steps {
 		mark := traceMark(s.Status)
-		fmt.Fprintf(w, "    %s %d. %s", mark, i+1, s.Name)
 		if s.Detail != "" {
-			fmt.Fprintf(w, " — %s", s.Detail)
+			line(w, "    %s %d. %s - %s", mark, i+1, s.Name, s.Detail)
+		} else {
+			line(w, "    %s %d. %s", mark, i+1, s.Name)
 		}
-		fmt.Fprintln(w)
 	}
 }
 
@@ -97,59 +121,59 @@ func renderDataset(w io.Writer, d domain.DatasetInfo) {
 	if d.Snapshot != "" {
 		desc += " snapshot=" + d.Snapshot
 	}
-	fmt.Fprintf(w, "    [*] Dataset      %s\n", desc)
+	line(w, "    [*] Dataset      %s", desc)
 	if d.Digest != "" {
-		fmt.Fprintf(w, "    [*] Digest       %s\n", d.Digest)
+		line(w, "    [*] Digest       %s", d.Digest)
 	}
 }
 
 func renderTarget(w io.Writer, t domain.Target) {
 	fmt.Fprintln(w, "[+] Target")
 	if t.Product != "" {
-		fmt.Fprintf(w, "    Product      %s\n", t.Product)
+		line(w, "    Product      %s", t.Product)
 	}
 	if t.Version != "" {
-		fmt.Fprintf(w, "    Version      %s\n", t.Version)
+		line(w, "    Version      %s", t.Version)
 	}
 	if t.CPE != "" {
-		fmt.Fprintf(w, "    CPE          %s\n", t.CPE)
+		line(w, "    CPE          %s", t.CPE)
 	}
 	if t.PURL != "" {
-		fmt.Fprintf(w, "    PURL         %s\n", t.PURL)
+		line(w, "    PURL         %s", t.PURL)
 	}
 	if t.ResolvedCPE != "" && t.ResolvedCPE != t.CPE {
-		fmt.Fprintf(w, "    Resolved     %s\n", t.ResolvedCPE)
+		line(w, "    Resolved     %s", t.ResolvedCPE)
 	}
 }
 
 func renderFinding(w io.Writer, f domain.Finding, opts RenderOptions) {
-	fmt.Fprintf(w, "    [+] %s\n", f.VulnerabilityID)
-	fmt.Fprintf(w, "        [*] Status       %s\n", strings.ToUpper(string(f.Status)))
+	line(w, "    [+] %s", f.VulnerabilityID)
+	line(w, "        [*] Status       %s", strings.ToUpper(string(f.Status)))
 	if f.Risk != nil {
 		if f.Risk.Severity != "" {
-			fmt.Fprintf(w, "        [*] Severity     %s\n", f.Risk.Severity)
+			line(w, "        [*] Severity     %s", f.Risk.Severity)
 		}
 		if f.Risk.CVSS != 0 {
 			v := ""
 			if f.Risk.CVSSVersion != "" {
 				v = " (v" + f.Risk.CVSSVersion + ")"
 			}
-			fmt.Fprintf(w, "        [*] CVSS         %s%s\n", formatFloat(f.Risk.CVSS), v)
+			line(w, "        [*] CVSS         %s%s", formatFloat(f.Risk.CVSS), v)
 		}
 	}
-	fmt.Fprintf(w, "        [*] Confidence   %s\n", strings.ToUpper(string(f.Confidence)))
+	line(w, "        [*] Confidence   %s", strings.ToUpper(string(f.Confidence)))
 	if f.Priority.Level != "" && f.Priority.Level != domain.PriorityNone {
-		line := "        [*] Priority     " + strings.ToUpper(f.Priority.Level)
+		text := "        [*] Priority     " + strings.ToUpper(f.Priority.Level)
 		if len(f.Priority.Factors) > 0 {
-			line += " (" + strings.Join(f.Priority.Factors, ", ") + ")"
+			text += " (" + strings.Join(f.Priority.Factors, ", ") + ")"
 		}
-		fmt.Fprintln(w, line)
+		fmt.Fprintln(w, text)
 	}
 	if f.Applicability.Range != "" {
-		fmt.Fprintf(w, "        [*] Matched      %s\n", f.Applicability.Range)
+		line(w, "        [*] Matched      %s", f.Applicability.Range)
 	}
 	if len(f.FixedVersions) > 0 {
-		fmt.Fprintf(w, "        [*] Fixed        %s\n", f.FixedVersions[0])
+		line(w, "        [*] Fixed        %s", f.FixedVersions[0])
 	}
 	if f.Remediation.Action != "" {
 		// The note already reads as an action, so show it alone rather than
@@ -161,59 +185,61 @@ func renderFinding(w io.Writer, f domain.Finding, opts RenderOptions) {
 				text += " to " + f.Remediation.FixedVersion
 			}
 		}
-		fmt.Fprintf(w, "        [*] Fix          %s\n", text)
+		line(w, "        [*] Fix          %s", text)
 	}
 	if f.KnownExploited != nil {
-		line := "        [*] KEV          YES"
+		text := "        [*] KEV          YES"
 		if f.KnownExploited.DateAdded != "" {
-			line += " (added " + f.KnownExploited.DateAdded + ")"
+			text += " (added " + f.KnownExploited.DateAdded + ")"
 		}
-		fmt.Fprintln(w, line)
+		fmt.Fprintln(w, text)
 	}
 	if f.Enrichment != nil {
 		if f.Enrichment.Mitigation != "" {
-			fmt.Fprintf(w, "        [*] Mitigation   %s\n", f.Enrichment.Mitigation)
+			line(w, "        [*] Mitigation   %s", f.Enrichment.Mitigation)
 		}
 		if f.Enrichment.PoCURL != "" {
-			fmt.Fprintf(w, "        [*] PoC          %s\n", f.Enrichment.PoCURL)
+			line(w, "        [*] PoC          %s", f.Enrichment.PoCURL)
 		}
 		if f.Enrichment.PatchCommitURL != "" {
-			fmt.Fprintf(w, "        [*] Patch        %s\n", f.Enrichment.PatchCommitURL)
+			line(w, "        [*] Patch        %s", f.Enrichment.PatchCommitURL)
 		}
 	}
 	if opts.Verbose && len(f.Why.Steps) > 0 {
 		fmt.Fprintln(w, "        [-] Why")
 		for _, s := range f.Why.Steps {
-			fmt.Fprintf(w, "            • %s\n", s)
+			line(w, "            - %s", s)
 		}
 	}
 	if f.Status == domain.FindingStatusInconclusive {
 		if f.Why.VersionMatch != "" {
-			fmt.Fprintf(w, "        [!] Undecided    %s\n", f.Why.VersionMatch)
+			line(w, "        [!] Undecided    %s", f.Why.VersionMatch)
 		}
 		for _, step := range f.Why.Steps {
-			fmt.Fprintf(w, "            • %s\n", step)
+			line(w, "            - %s", step)
 		}
 		for _, q := range f.Why.Questions {
-			fmt.Fprintf(w, "            ? %s\n", q)
+			line(w, "            ? %s", q)
 		}
 	}
 	if len(f.Conflicts) > 0 {
-		fmt.Fprintf(w, "        [!] Conflicts    sources disagree (%d kind(s))\n", len(f.Conflicts))
+		line(w, "        [!] Conflicts    sources disagree (%d kind(s))", len(f.Conflicts))
 		for _, c := range f.Conflicts {
 			for _, v := range c.Values {
-				fmt.Fprintf(w, "            %s %s = %s\n", strings.ToUpper(string(c.Kind)), v.Source, v.Value)
+				line(w, "            %s %s = %s", strings.ToUpper(string(c.Kind)), v.Source, v.Value)
 			}
 		}
 	}
-	fmt.Fprintf(w, "        [*] Evidence     %d\n", len(f.Evidence))
+	line(w, "        [*] Evidence     %d", len(f.Evidence))
 }
 
 func renderHumanQuiet(w io.Writer, r domain.Report) error {
+	if len(r.Findings) == 0 {
+		line(w, "%s", strings.ToUpper(string(r.Decision)))
+		return nil
+	}
 	for _, f := range r.Findings {
-		if _, err := fmt.Fprintf(w, "%s %s\n", f.VulnerabilityID, strings.ToUpper(string(f.Status))); err != nil {
-			return err
-		}
+		line(w, "%s %s", f.VulnerabilityID, strings.ToUpper(string(f.Status)))
 	}
 	return nil
 }
@@ -230,7 +256,7 @@ func printAttributionFooter(w io.Writer, findings []domain.Finding) {
 		return
 	}
 	fmt.Fprintln(w)
-	fmt.Fprintf(w, "[!] Enrichment data: %s\n", attr)
+	line(w, "[!] Enrichment data: %s", attr)
 }
 
 func enrichmentAttribution(e *domain.Enrichment) string {
