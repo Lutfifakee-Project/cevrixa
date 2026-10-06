@@ -439,3 +439,39 @@ func TestDetectRiskCopied(t *testing.T) {
 		t.Fatalf("Risk incomplete: %+v", f.Risk)
 	}
 }
+
+// The report decision is part of the frozen v1.0.0 contract: a target the
+// engine proved affected must report affected, and a target it could not even
+// identify must not be reported as a clean result.
+func TestReportDecisionAffected(t *testing.T) {
+	report, err := Detect(domain.Target{CPE: "cpe:2.3:a:apache:http_server:2.4.49:*:*:*:*:*:*:*"}, Options{})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	if report.Decision != domain.DecisionAffected {
+		t.Fatalf("decision = %q, want affected", report.Decision)
+	}
+}
+
+func TestReportDecisionIdentityUnresolved(t *testing.T) {
+	report, err := Detect(domain.Target{Product: "Nonexistent Software", Version: "1.0"}, Options{})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	if report.Decision != domain.DecisionIdentityUnresolved {
+		t.Fatalf("decision = %q, want identity_unresolved", report.Decision)
+	}
+}
+
+func TestReportDecisionNoDataForFixedVersion(t *testing.T) {
+	report, err := Detect(domain.Target{CPE: "cpe:2.3:a:apache:http_server:2.4.51:*:*:*:*:*:*:*"}, Options{})
+	if err != nil {
+		t.Fatalf("Detect: %v", err)
+	}
+	// 2.4.51 is outside the affected range, so there is no affected finding. A
+	// resolved target with no matching candidate is no_data, never a clean
+	// not_affected.
+	if report.Decision != domain.DecisionNoData {
+		t.Fatalf("decision = %q, want no_data", report.Decision)
+	}
+}
