@@ -86,6 +86,23 @@ is available. Use `--no-sync` for non-interactive and CI environments.
 That is enough to get started. To see everything else, run `cevrixa -h` or
 `cevrixa detect -h`.
 
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `detect` | Detect whether one target is affected (product, CPE, PURL, or SBOM) |
+| `scan` | Read many targets from a file or stdin |
+| `explain` | Explain why a vulnerability does or does not apply |
+| `sync` | Download vulnerability data (all sources by default) |
+| `doctor` | Check the environment and dataset health |
+| `info` | Show environment and dataset status |
+| `version` | Print version and build information |
+| `snapshot` | Freeze and list reproducible intelligence states |
+
+`why`, `why-not`, and the top-level `sbom` command are deprecated
+but still work; they print a warning and point at `explain` and
+`detect --sbom`.
+
 ## How it works
 
 The detection pipeline turns an input into an evidence-backed decision:

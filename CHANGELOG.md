@@ -22,6 +22,25 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+### Added
+
+- detect --sbom so an SBOM is one input shape, not a separate concept.
+- First-run auto-sync, with --no-sync for CI.
+- A report decision model: affected, inconclusive, no_data, identity_unresolved.
+- --quiet/--verbose for scan; --quiet for detect --sbom.
+- --db for doctor.
+
+### Changed
+
+- sync with no target now syncs every source; named sources stay advanced.
+- Empty reports state IDENTITY UNRESOLVED or NO DATA.
+- Usage grouped into Primary, Bulk/Data, Diagnostics, Advanced.
+
+### Deprecated
+
+- why and why-not; use explain.
+- The top-level sbom command; use detect --sbom.
+
 ## [v0.9.1] — 2026-10-06
 
 Version matching fixes found by testing against live NVD and OSV data.
