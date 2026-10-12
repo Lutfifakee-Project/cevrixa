@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/engine"
@@ -40,6 +41,9 @@ func runDetect(args []string) error {
 		return nil
 	}
 	if err != nil {
+		if errors.Is(err, errNoTarget) {
+			printDetectExamples(os.Stderr)
+		}
 		return err
 	}
 
@@ -237,8 +241,14 @@ func readOneTarget(r io.Reader) (domain.Target, error) {
 	return t, nil
 }
 
+// errNoTarget marks the "no target given" validation failure so runDetect can
+// print the example block separately instead of embedding newlines in the
+// error string.
+var errNoTarget = errors.New("detect: no target given")
+
 func parseDetectArgs(args []string) (detectFlags, error) {
 	var f detectFlags
+	var positionals []string
 
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
@@ -272,10 +282,17 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 			continue
 		}
 
+		// Positional arguments are the v1.0.2 shorthand: a bare product (and
+		// optional version) or a bare PURL. Flags keep working unchanged.
+		if !strings.HasPrefix(arg, "-") {
+			positionals = append(positionals, arg)
+			continue
+		}
+
 		key, value, hasInlineValue := splitFlag(arg)
 		if !hasInlineValue {
 			if i+1 >= len(args) {
-				return f, fmt.Errorf("detect: flag %q requires a value", arg)
+				return f, fmt.Errorf("detect: flag %q requires a value (e.g. %s <value>)", arg, arg)
 			}
 			value = args[i+1]
 			i++
@@ -302,14 +319,48 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 		case "--snapshot":
 			f.Snapshot = value
 		default:
-			return f, fmt.Errorf("detect: unknown flag %q", key)
+			return f, fmt.Errorf("detect: unknown flag %q (run 'cevrixa detect --help')", key)
 		}
+	}
+
+	if err := applyDetectPositionals(&f, positionals); err != nil {
+		return f, err
 	}
 
 	if err := validateDetectFlags(f); err != nil {
 		return f, err
 	}
 	return f, nil
+}
+
+// applyDetectPositionals folds bare positional arguments into the flag struct.
+// A single argument that starts with "pkg:" is a PURL; otherwise the first is
+// a product and the second a version. Mixing positional and flag forms for the
+// same field is rejected so the user is never left guessing which one won.
+func applyDetectPositionals(f *detectFlags, positionals []string) error {
+	if len(positionals) == 0 {
+		return nil
+	}
+	if f.Product != "" || f.Version != "" || f.PURL != "" || f.CPE != "" {
+		return errors.New("detect: do not mix positional arguments with --product/--version/--purl/--cpe")
+	}
+
+	if strings.HasPrefix(positionals[0], "pkg:") {
+		if len(positionals) > 1 {
+			return fmt.Errorf("detect: unexpected extra argument %q after PURL %q", positionals[1], positionals[0])
+		}
+		f.PURL = positionals[0]
+		return nil
+	}
+
+	if len(positionals) > 2 {
+		return fmt.Errorf("detect: too many arguments; expected 'detect <product> [version]', got %d", len(positionals))
+	}
+	f.Product = positionals[0]
+	if len(positionals) == 2 {
+		f.Version = positionals[1]
+	}
+	return nil
 }
 
 func splitFlag(arg string) (key, value string, hasValue bool) {
@@ -342,14 +393,14 @@ func validateDetectFlags(f detectFlags) error {
 		}
 	} else {
 		if identityCount == 0 {
-			return errors.New("detect: one of --product, --cpe, --purl, --sbom, or - is required")
+			return errNoTarget
 		}
 	}
 	if identityCount > 1 {
 		return errors.New("detect: use only one of --product, --cpe, --purl, or --sbom")
 	}
 	if f.Product != "" && f.Version == "" {
-		return errors.New("detect: --product requires --version")
+		return fmt.Errorf("detect: product %q needs a version (try: cevrixa detect %s <version>)", f.Product, f.Product)
 	}
 	if f.Product == "" && f.Version != "" {
 		return errors.New("detect: --version requires --product")
@@ -368,11 +419,26 @@ func validateDetectFlags(f detectFlags) error {
 	return nil
 }
 
+func printDetectExamples(w io.Writer) {
+	fmt.Fprintln(w, "  Try: cevrixa detect nginx 1.24.0")
+	fmt.Fprintln(w, "       cevrixa detect pkg:pypi/django@4.2.0")
+	fmt.Fprintln(w, "       cevrixa detect --sbom app.cdx.json")
+	fmt.Fprintln(w, "  Or:  cevrixa detect --help")
+}
+
 func printDetectUsage() {
-	fmt.Println("Usage: cevrixa detect [flags]")
+	fmt.Println("Usage: cevrixa detect [product] [version] [flags]")
+	fmt.Println("       cevrixa detect <purl> [flags]")
+	fmt.Println("       cevrixa detect --sbom <file> [flags]")
 	fmt.Println("       cevrixa detect -          (read one target JSON object from stdin)")
 	fmt.Println()
 	fmt.Println("Determine whether a target is affected by known vulnerabilities.")
+	fmt.Println()
+	fmt.Println("Examples:")
+	fmt.Println("  cevrixa detect nginx 1.24.0")
+	fmt.Println("  cevrixa detect pkg:pypi/django@4.2.0")
+	fmt.Println("  cevrixa detect --product nginx --version 1.24.0")
+	fmt.Println("  cevrixa detect --purl pkg:pypi/django@4.2.0 --output json")
 	fmt.Println()
 	fmt.Println("Flags:")
 	fmt.Println("  --product <name>     Product name (requires --version)")

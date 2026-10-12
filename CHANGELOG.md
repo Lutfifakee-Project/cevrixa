@@ -20,6 +20,25 @@ Categories:
 
 Versions follow Semantic Versioning.
 
+## [v1.0.2] — 2026-10-13
+
+CLI usability. Detection semantics, the decision model, and every existing
+command form are unchanged.
+
+### Added
+
+- `detect` accepts a product and version as plain arguments
+  (`cevrixa detect nginx 1.24.0`) and a PURL as a plain argument
+  (`cevrixa detect pkg:pypi/django@4.2.0`). The flag form still works.
+- `cevrixa help <command>` routes to that command's help. Running
+  `cevrixa` with no arguments prints a quick-start block.
+
+### Changed
+
+- Errors now name the problem and the fix: a missing target lists example
+  commands, and a product without a version shows the corrected command.
+- `cevrixa detect --help` leads with runnable examples.
+
 ## [v1.0.1] — 2026-10-07
 
 Documentation and repository hygiene. No change to detection behaviour, the

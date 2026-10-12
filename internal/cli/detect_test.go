@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -42,6 +43,12 @@ func TestParseDetectArgs(t *testing.T) {
 		{"with kev", []string{"--cpe", "cpe:2.3:a:x:y:1:*:*:*:*:*:*:*", "--with-kev"}, detectFlags{CPE: "cpe:2.3:a:x:y:1:*:*:*:*:*:*:*", WithKEV: true}, false},
 		{"unknown flag", []string{"--bogus", "x"}, detectFlags{}, true},
 		{"missing value", []string{"--product"}, detectFlags{}, true},
+		// v1.0.2 positional shorthand.
+		{"positional product+version", []string{"nginx", "1.24.0"}, detectFlags{Product: "nginx", Version: "1.24.0"}, false},
+		{"positional purl", []string{"pkg:pypi/django@4.2.0"}, detectFlags{PURL: "pkg:pypi/django@4.2.0"}, false},
+		{"positional mix rejected", []string{"nginx", "1.24.0", "--product", "x"}, detectFlags{}, true},
+		{"positional too many", []string{"nginx", "1.24.0", "extra"}, detectFlags{}, true},
+		{"positional purl extra", []string{"pkg:pypi/django@4.2.0", "extra"}, detectFlags{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -56,6 +63,26 @@ func TestParseDetectArgs(t *testing.T) {
 				t.Fatalf("got %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestDetectNoTargetHint(t *testing.T) {
+	err := validateDetectFlags(detectFlags{})
+	if err == nil {
+		t.Fatal("expected an error for a missing target")
+	}
+	if !strings.Contains(err.Error(), "no target") {
+		t.Fatalf("error should explain the missing target, got: %v", err)
+	}
+}
+
+func TestDetectProductHint(t *testing.T) {
+	err := validateDetectFlags(detectFlags{Product: "nginx"})
+	if err == nil {
+		t.Fatal("expected an error for a product without a version")
+	}
+	if !strings.Contains(err.Error(), "nginx") {
+		t.Fatalf("error should name the product, got: %v", err)
 	}
 }
 

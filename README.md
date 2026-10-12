@@ -51,13 +51,13 @@ go build ./cmd/cevrixa
 Check a software version:
 
 ```bash
-cevrixa detect --product "nginx" --version 1.24.0
+cevrixa detect nginx 1.24.0
 ```
 
 Check a package:
 
 ```bash
-cevrixa detect --purl "pkg:pypi/django@4.2.0"
+cevrixa detect pkg:pypi/django@4.2.0
 ```
 
 Check an SBOM:
@@ -84,11 +84,10 @@ When no local dataset exists, Cevrixa offers to sync it on first run. Use
 Use machine-readable output:
 
 ```bash
-cevrixa detect --purl "pkg:pypi/django@4.2.0" --output json
+cevrixa detect pkg:pypi/django@4.2.0 --output json
 ```
 
-Run `cevrixa --help` or `cevrixa detect --help` for the complete command
-reference.
+Run `cevrixa help` for the command list, `cevrixa help <command>` for one command, and `cevrixa` with no arguments for a quick start.
 
 > `why` and `why-not` are deprecated but still work; they print a
 > warning and point at `explain`. The top-level `sbom` command is
