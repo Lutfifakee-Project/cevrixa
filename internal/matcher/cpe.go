@@ -96,6 +96,16 @@ func matchOrNode(node domain.ApplicabilityNode, target domain.CPE, v version.Ver
 // alone. Treating those groups as OR is what produces the well known CPE false
 // positives, so they are reported as undecided instead.
 func matchAndNode(node domain.ApplicabilityNode, target domain.CPE, v version.Version) nodeOutcome {
+	if !nodeNamesVulnerableTarget(node, target) {
+		// No vulnerable component in this AND group identifies the target, so
+		// the group cannot make the target affected. This is a decided
+		// non-match, not genuine uncertainty: an AND over unrelated components
+		// (or over environmental requirements alone) must never surface as an
+		// INCONCLUSIVE finding for a target it does not mention. Without this
+		// guard an unrelated product becomes a finding solely because some
+		// required component of the AND could not be evaluated.
+		return nodeOutcome{decided: true}
+	}
 	var (
 		vulnerableMatch  *Result
 		vulnerableFailed *Result
