@@ -17,6 +17,7 @@ import (
 type scanFlags struct {
 	Input    string
 	Output   string
+	OutFile  string
 	WithKEV  bool
 	FailOn   string
 	DB       string
@@ -79,24 +80,30 @@ func runScan(args []string) error {
 		reports = append(reports, r)
 	}
 
+	w, closeOut, err := reportWriter(flags.OutFile)
+	if err != nil {
+		return fmt.Errorf("scan: open --output-file: %w", err)
+	}
+	defer closeOut()
+
 	switch flags.Output {
 	case "", "human":
-		if err := output.RenderScanHumanWithOptions(os.Stdout, reports, output.RenderOptions{
+		if err := output.RenderScanHumanWithOptions(w, reports, output.RenderOptions{
 			Verbose: flags.Verbose,
 			Quiet:   flags.Quiet,
 		}); err != nil {
 			return err
 		}
 	case "json":
-		if err := output.RenderScanJSON(os.Stdout, reports); err != nil {
+		if err := output.RenderScanJSON(w, reports); err != nil {
 			return err
 		}
 	case "jsonl":
-		if err := output.RenderScanJSONL(os.Stdout, reports); err != nil {
+		if err := output.RenderScanJSONL(w, reports); err != nil {
 			return err
 		}
 	case "sarif":
-		if err := output.RenderScanSARIF(os.Stdout, reports, Version); err != nil {
+		if err := output.RenderScanSARIF(w, reports, Version); err != nil {
 			return err
 		}
 	default:
@@ -154,6 +161,8 @@ func parseScanArgs(args []string) (scanFlags, error) {
 		switch key {
 		case "--output":
 			f.Output = value
+		case "--output-file":
+			f.OutFile = value
 		case "--fail-on":
 			f.FailOn = value
 		case "--db":
@@ -246,6 +255,7 @@ func printScanUsage() {
 	fmt.Println("  --verbose            Show full reasoning steps")
 	fmt.Println("  --quiet              Print only CVE-ID + status per finding")
 	fmt.Println("  --output <fmt>       Output format: human (default), json, jsonl, or sarif")
+	fmt.Println("  --output-file <path> Write the report to a file instead of stdout")
 	fmt.Println("  -h, --help           Show this help")
 	fmt.Println()
 	fmt.Println("Examples:")

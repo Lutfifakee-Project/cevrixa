@@ -20,6 +20,12 @@ func main() {
 	logger.Debug("cevrixa starting", "log_level", cfg.LogLevel)
 
 	if err := cli.Run(os.Args[1:]); err != nil {
+		// A downstream consumer that stops reading (for example a command
+		// piped into head) closes the pipe; that is a clean stop, not a
+		// failure, so it stays quiet and exits zero.
+		if isBrokenPipe(err) {
+			return
+		}
 		fmt.Fprintf(os.Stderr, "cevrixa: %v\n", err)
 		os.Exit(1)
 	}

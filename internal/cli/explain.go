@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 	"github.com/Lutfifakee-Project/cevrixa/internal/engine"
@@ -20,6 +19,7 @@ type explainFlags struct {
 	CPE     string
 	PURL    string
 	Output  string
+	OutFile string
 	DB      string
 	DBSet   bool
 	Verbose bool
@@ -41,14 +41,20 @@ func runExplain(args []string) error {
 		return err
 	}
 
+	w, closeOut, err := reportWriter(flags.OutFile)
+	if err != nil {
+		return fmt.Errorf("explain: open --output-file: %w", err)
+	}
+	defer closeOut()
+
 	switch flags.Output {
 	case "", "human":
-		return output.RenderExplainHumanWithOptions(os.Stdout, report, output.RenderOptions{
+		return output.RenderExplainHumanWithOptions(w, report, output.RenderOptions{
 			Verbose: flags.Verbose,
 			Quiet:   flags.Quiet,
 		})
 	case "json":
-		return output.RenderExplainJSON(os.Stdout, report)
+		return output.RenderExplainJSON(w, report)
 	default:
 		return fmt.Errorf("explain: unsupported --output %q", flags.Output)
 	}
@@ -292,6 +298,11 @@ func parseTargetArgs(args []string, command string) (explainFlags, error) {
 			f.PURL = value
 		case "--output":
 			f.Output = value
+		case "--output-file":
+			if command != "explain" {
+				return f, fmt.Errorf("%s: unknown flag %q", command, key)
+			}
+			f.OutFile = value
 		case "--db":
 			f.DB = value
 			f.DBSet = true
@@ -350,7 +361,8 @@ func printTargetUsage(command string) {
 		fmt.Println("Explain why a vulnerability does or does not apply to a target.")
 		fmt.Println()
 		fmt.Println("Flags: --product NAME --version VER | --cpe CPE | --purl PURL")
-		fmt.Println("       --db PATH --output human|json --verbose --quiet --trace -h")
+		fmt.Println("       --output human|json --output-file PATH --db PATH")
+		fmt.Println("       --verbose --quiet --trace -h")
 	}
 }
 

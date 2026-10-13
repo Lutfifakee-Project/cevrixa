@@ -23,6 +23,7 @@ type detectFlags struct {
 	PURL     string
 	SBOM     string
 	Output   string
+	OutFile  string
 	WithKEV  bool
 	FailOn   string
 	DB       string
@@ -108,19 +109,25 @@ func runDetect(args []string) error {
 		}
 	}
 
+	w, closeOut, err := reportWriter(flags.OutFile)
+	if err != nil {
+		return fmt.Errorf("detect: open --output-file: %w", err)
+	}
+	defer closeOut()
+
 	var renderErr error
 	switch flags.Output {
 	case "", "human":
-		renderErr = output.RenderHumanWithOptions(os.Stdout, report, output.RenderOptions{
+		renderErr = output.RenderHumanWithOptions(w, report, output.RenderOptions{
 			Verbose: flags.Verbose,
 			Quiet:   flags.Quiet,
 		})
 	case "json":
-		renderErr = output.RenderJSON(os.Stdout, report)
+		renderErr = output.RenderJSON(w, report)
 	case "jsonl":
-		renderErr = output.RenderJSONL(os.Stdout, report)
+		renderErr = output.RenderJSONL(w, report)
 	case "sarif":
-		renderErr = output.RenderSARIF(os.Stdout, report, Version)
+		renderErr = output.RenderSARIF(w, report, Version)
 	default:
 		return fmt.Errorf("detect: unsupported --output %q", flags.Output)
 	}
@@ -184,24 +191,30 @@ func detectSBOM(flags detectFlags, dbPath string) error {
 		reports = append(reports, r)
 	}
 
+	w, closeOut, err := reportWriter(flags.OutFile)
+	if err != nil {
+		return fmt.Errorf("detect: open --output-file: %w", err)
+	}
+	defer closeOut()
+
 	switch flags.Output {
 	case "", "human":
-		if err := output.RenderScanHumanWithOptions(os.Stdout, reports, output.RenderOptions{
+		if err := output.RenderScanHumanWithOptions(w, reports, output.RenderOptions{
 			Verbose: flags.Verbose,
 			Quiet:   flags.Quiet,
 		}); err != nil {
 			return err
 		}
 	case "json":
-		if err := output.RenderScanJSON(os.Stdout, reports); err != nil {
+		if err := output.RenderScanJSON(w, reports); err != nil {
 			return err
 		}
 	case "jsonl":
-		if err := output.RenderScanJSONL(os.Stdout, reports); err != nil {
+		if err := output.RenderScanJSONL(w, reports); err != nil {
 			return err
 		}
 	case "sarif":
-		if err := output.RenderScanSARIF(os.Stdout, reports, Version); err != nil {
+		if err := output.RenderScanSARIF(w, reports, Version); err != nil {
 			return err
 		}
 	default:
@@ -311,6 +324,8 @@ func parseDetectArgs(args []string) (detectFlags, error) {
 			f.SBOM = value
 		case "--output":
 			f.Output = value
+		case "--output-file":
+			f.OutFile = value
 		case "--fail-on":
 			f.FailOn = value
 		case "--db":
@@ -456,5 +471,6 @@ func printDetectUsage() {
 	fmt.Println("  --quiet              Print only CVE-ID + status per finding")
 	fmt.Println("  --trace              Show the decision trace behind the result")
 	fmt.Println("  --output <fmt>       Output format: human (default), json, jsonl, or sarif")
+	fmt.Println("  --output-file <path> Write the report to a file instead of stdout")
 	fmt.Println("  -h, --help           Show this help")
 }
