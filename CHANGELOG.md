@@ -20,6 +20,50 @@ Categories:
 
 Versions follow Semantic Versioning.
 
+## [v1.0.3] — 2026-10-13
+
+Accuracy and output. Detection semantics and the decision model are
+unchanged: a report still distinguishes affected, inconclusive, no_data,
+and identity_unresolved, and INCONCLUSIVE is never turned into a clean
+result. This release sharpens which candidates are evaluated at all, and
+how a report is written and shaped.
+
+### Added
+
+- `--output-file PATH` on `detect`, `detect --sbom`, `scan`, and
+  `explain`, so a report can be written to a file while `--output` still
+  selects json, jsonl, or sarif. The file holds only the report.
+- A report decision line and a one-line finding summary (counts by status,
+  and severity counts for affected findings) in human output.
+- On-demand NVD fetch: when `explain` is asked about a CVE that is not in the
+  local dataset, Cevrixa fetches that single record by ID from NVD and
+  evaluates it with the same matcher and engine as local data. A CVE that
+  NVD does not have is reported distinctly from a network, rate-limit, or
+  parse failure; the fetch is never persisted unless the user runs a sync.
+
+### Changed
+
+- Human output is quieter by default: evidence counts, inconclusive
+  question lists, and per-source conflict values now require `--verbose`.
+  Decision, status, severity, and remediation stay in the default view.
+- `sync nvd --days` now rejects values above the NVD API limit of 120 days
+  with a clear error that points at `--full` for full history.
+
+### Fixed
+
+- A closed output pipe (for example piping into `head` or a consumer that
+  exits early) no longer prints a spurious write error or exits non-zero.
+  Real write errors, such as an unwritable `--output-file` path, still fail.
+
+### Detection
+
+- Candidate relevance: an AND configuration that does not name the target
+  as a vulnerable component is now a decided non-match instead of an
+  INCONCLUSIVE finding. Previously an unrelated product could surface as a
+  finding only because some required component of the AND could not be
+  evaluated. A target that does match a vulnerable component of an AND
+  group, with an unknown additional prerequisite, still stays INCONCLUSIVE.
+
 ## [v1.0.2] — 2026-10-13
 
 CLI usability. Detection semantics, the decision model, and every existing

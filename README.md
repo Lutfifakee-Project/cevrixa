@@ -87,6 +87,17 @@ Use machine-readable output:
 cevrixa detect pkg:pypi/django@4.2.0 --output json
 ```
 
+Write a report to a file (the file holds only the report, never progress
+or diagnostics):
+
+```bash
+cevrixa scan targets.json --output sarif --output-file results.sarif
+```
+
+Human output is concise by default: a report decision, a one-line summary,
+and each finding with its status, severity, and fix. Add `--verbose` for
+evidence counts, inconclusive question lists, and per-source conflicts.
+
 Run `cevrixa help` for the command list, `cevrixa help <command>` for one command, and `cevrixa` with no arguments for a quick start.
 
 > `why` and `why-not` are deprecated but still work; they print a
