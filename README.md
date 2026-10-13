@@ -8,37 +8,36 @@
 [![Release](https://img.shields.io/github/v/release/Lutfifakee-Project/cevrixa)](https://github.com/Lutfifakee-Project/cevrixa/releases)
 [![License](https://img.shields.io/github/license/Lutfifakee-Project/cevrixa)](LICENSE)
 
-Cevrixa determines whether a specific software or package version is affected by known vulnerabilities.
-
-It focuses on __why a vulnerability applies__, providing evidence and source provenance behind each result.
+Cevrixa determines whether a specific software or package version is
+affected by a known vulnerability, and explains why. It is not a generic
+CVE scanner: it decides applicability against a concrete version, shows
+the evidence, and states what remains unknown.
 
 ## Features
 
-- Version-aware vulnerability applicability
-- Evidence-first detection
-- CPE and PURL support
-- Multiple vulnerability intelligence sources
-- Source provenance
-- Conflict-aware results
-- Local and reproducible data
-- JSON, JSONL, and SARIF output
-- Offline-friendly workflow
+- Version-aware applicability: affected, not_affected, or inconclusive, never guessed
+- CPE and PURL targets, plus SBOM input (CycloneDX and SPDX)
+- Evidence-first results with source provenance
+- Candidate relevance: unrelated CVEs are not reported as findings
+- Machine-readable output: JSON, JSONL, and SARIF
+- Local, reproducible dataset; offline-friendly
+- Concise default output, full reasoning with `--verbose`
 
 ## Installation
 
-### Go Install
+### go install
 
 ```bash
-go install github.com/Lutfifakee-Project/cevrixa/cmd/cevrixa@latest
+go install github.com/Lutfifakee-Project/cevrixa/cmd/cevrixa@v1.0.3
 ```
 
-Then verify:
+Verify the install:
 
 ```bash
 cevrixa -h
 ```
 
-### From Source
+### From source
 
 ```bash
 git clone https://github.com/Lutfifakee-Project/cevrixa.git
@@ -46,42 +45,40 @@ cd cevrixa
 go build ./cmd/cevrixa
 ```
 
-## Usage
+## Quick Start
 
-Check a software version:
+Check a product and version:
 
 ```bash
 cevrixa detect nginx 1.24.0
 ```
 
-Check a package:
+Check a package (PURL):
 
 ```bash
 cevrixa detect pkg:pypi/django@4.2.0
 ```
 
-Check an SBOM:
+Check an SBOM (CycloneDX or SPDX):
 
 ```bash
 cevrixa detect --sbom app.cdx.json
 ```
 
-Explain a result:
+Explain one CVE against a target:
 
 ```bash
 cevrixa explain CVE-2021-41773 --product "Apache HTTP Server" --version 2.4.49
 ```
 
-Update vulnerability data:
+If the CVE is not in the local dataset, `explain` tries to fetch that
+single record from NVD. A network or API failure is reported differently
+from "NVD has no record for this CVE". A fetched record is used for that
+run only; it is not saved to your database.
 
-```bash
-cevrixa sync
-```
+### Output
 
-When no local dataset exists, Cevrixa offers to sync it on first run. Use
-`--no-sync` for non-interactive and CI environments.
-
-Use machine-readable output:
+Machine-readable output:
 
 ```bash
 cevrixa detect pkg:pypi/django@4.2.0 --output json
@@ -94,56 +91,57 @@ or diagnostics):
 cevrixa scan targets.json --output sarif --output-file results.sarif
 ```
 
-Human output is concise by default: a report decision, a one-line summary,
-and each finding with its status, severity, and fix. Add `--verbose` for
-evidence counts, inconclusive question lists, and per-source conflicts.
+Add `--verbose` for evidence counts, inconclusive question lists,
+and per-source conflicts.
 
-Run `cevrixa help` for the command list, `cevrixa help <command>` for one command, and `cevrixa` with no arguments for a quick start.
+## Understanding Results
 
-> `why` and `why-not` are deprecated but still work; they print a
-> warning and point at `explain`. The top-level `sbom` command is
-> deprecated too; use `detect --sbom`.
+Each report carries one overall decision:
 
-## How It Works
+- `affected` - at least one finding proved the target is affected
+- `inconclusive` - a candidate exists but applicability could not be decided
+- `no_data` - no matching candidate in the current dataset; this does
+  not prove the target is safe
+- `identity_unresolved` - the target could not be resolved to a reliable
+  identity, so nothing was evaluated
 
-```text
-Input
-  ↓
-Identity Resolution
-  ↓
-Vulnerability Correlation
-  ↓
-Version Applicability
-  ↓
-Evidence Evaluation
-  ↓
-Result
+Within a finding, `not_affected` means applicability was evaluated and
+the target does not meet the affected condition. An `inconclusive`
+question is never reported as `not_affected`.
+
+## Updating Vulnerability Data
+
+```bash
+cevrixa sync
 ```
 
-Cevrixa evaluates vulnerability intelligence against the identified software or package version instead of relying on a simple product or CVE match.
+updates every source using the default workflow. For a bounded NVD window:
 
-A report carries one overall decision:
+```bash
+cevrixa sync nvd --days 7
+```
 
-- `affected` — at least one finding proved the target is affected.
-- `inconclusive` — a candidate exists but applicability could not be decided reliably.
-- `no_data` — the target was evaluated but the dataset held no matching candidate. This does not prove the target is safe.
-- `identity_unresolved` — the target could not be mapped to a reliable identity, so nothing was evaluated.
+`--days` is capped at 120, the NVD API limit per request. Cevrixa does
+not bundle the entire NVD history by default; the local dataset reflects
+what you have synced.
 
-Within a finding, `not_affected` means applicability was evaluated and the target does not satisfy the affected condition. A question Cevrixa cannot answer is never reported as a clean result.
+## Data Sources
 
-## Supported Sources
+- [NVD](https://nvd.nist.gov/) - CVE records and CPE applicability statements
+- [OSV](https://osv.dev/) - package vulnerability ranges
+- [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) - known exploited vulnerabilities
 
-- [NVD](https://nvd.nist.gov/) — CVE records and CPE applicability statements
-- [OSV](https://osv.dev/) — package vulnerability ranges
-- [CISA KEV](https://www.cisa.gov/known-exploited-vulnerabilities-catalog) — known exploited vulnerabilities
+Cevrixa preserves source provenance and does not hide conflicting source
+information.
 
-Cevrixa preserves source provenance and does not silently hide conflicting source information.
+## Documentation
+
+Run `cevrixa help` for the command list, or `cevrixa help <command>` for
+one command.
 
 ## Contributing
 
-Contributions are welcome.
-
-See [`CONTRIBUTING.md`](CONTRIBUTING.md) for contribution guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
