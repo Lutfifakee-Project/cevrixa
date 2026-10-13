@@ -34,6 +34,15 @@ func RenderHumanWithOptions(w io.Writer, r domain.Report, opts RenderOptions) er
 	renderTarget(w, r.Target)
 	fmt.Fprintln(w)
 	line(w, "[*] Findings: %d", len(r.Findings))
+	// With findings, the header states the overall verdict at a glance. With
+	// none, the dedicated block below states it instead, so the same word is
+	// not printed twice in a row.
+	if len(r.Findings) > 0 {
+		line(w, "[*] Decision  %s", reportDecisionLabel(r))
+	}
+	if summary := findingSummary(r.Findings); summary != "" {
+		line(w, "[*] Summary   %s", summary)
+	}
 	renderDataset(w, r.Dataset)
 
 	if len(r.Findings) == 0 {
@@ -218,22 +227,28 @@ func renderFinding(w io.Writer, f domain.Finding, opts RenderOptions) {
 		if f.Why.VersionMatch != "" {
 			line(w, "        [!] Undecided    %s", f.Why.VersionMatch)
 		}
-		for _, step := range f.Why.Steps {
-			line(w, "            - %s", step)
-		}
-		for _, q := range f.Why.Questions {
-			line(w, "            ? %s", q)
+		if opts.Verbose {
+			for _, step := range f.Why.Steps {
+				line(w, "            - %s", step)
+			}
+			for _, q := range f.Why.Questions {
+				line(w, "            ? %s", q)
+			}
 		}
 	}
 	if len(f.Conflicts) > 0 {
 		line(w, "        [!] Conflicts    sources disagree (%d kind(s))", len(f.Conflicts))
-		for _, c := range f.Conflicts {
-			for _, v := range c.Values {
-				line(w, "            %s %s = %s", strings.ToUpper(string(c.Kind)), v.Source, v.Value)
+		if opts.Verbose {
+			for _, c := range f.Conflicts {
+				for _, v := range c.Values {
+					line(w, "            %s %s = %s", strings.ToUpper(string(c.Kind)), v.Source, v.Value)
+				}
 			}
 		}
 	}
-	line(w, "        [*] Evidence     %d", len(f.Evidence))
+	if opts.Verbose {
+		line(w, "        [*] Evidence     %d", len(f.Evidence))
+	}
 }
 
 func renderHumanQuiet(w io.Writer, r domain.Report) error {
@@ -278,4 +293,78 @@ func enrichmentAttribution(e *domain.Enrichment) string {
 
 func formatFloat(f float64) string {
 	return strconv.FormatFloat(f, 'f', 1, 64)
+}
+
+// reportDecisionLabel renders the report decision for human output. It is
+// separate from the finding statuses so that a report decision of NO DATA or
+// IDENTITY UNRESOLVED is never read as a clean result.
+func reportDecisionLabel(r domain.Report) string {
+	switch r.Decision {
+	case domain.DecisionAffected:
+		return "AFFECTED"
+	case domain.DecisionInconclusive:
+		return "INCONCLUSIVE"
+	case domain.DecisionIdentityUnresolved:
+		return "IDENTITY UNRESOLVED"
+	case domain.DecisionNoData:
+		return "NO DATA"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+// findingSummary is a one-line tally of findings by status and severity, so a
+// large result can be judged before reading every finding. It returns an empty
+// string when there are no findings, because the zero-findings case is already
+// stated by the decision block.
+func findingSummary(findings []domain.Finding) string {
+	if len(findings) == 0 {
+		return ""
+	}
+
+	statusOrder := []domain.FindingStatus{
+		domain.FindingStatusAffected,
+		domain.FindingStatusInconclusive,
+		domain.FindingStatusNotAffected,
+		domain.FindingStatusUnknown,
+	}
+	statusCount := map[domain.FindingStatus]int{}
+	severityCount := map[string]int{}
+	for _, f := range findings {
+		statusCount[f.Status]++
+		if f.Status == domain.FindingStatusAffected {
+			if sev := domain.CanonicalSeverity(severityOf(f)); sev != "" {
+				severityCount[sev]++
+			}
+		}
+	}
+
+	parts := make([]string, 0, len(statusOrder))
+	for _, st := range statusOrder {
+		if n := statusCount[st]; n > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", n, strings.ToUpper(string(st))))
+		}
+	}
+
+	sevOrder := []string{"critical", "high", "medium", "low", "none"}
+	sevParts := make([]string, 0, len(sevOrder))
+	for _, sev := range sevOrder {
+		if n := severityCount[sev]; n > 0 {
+			sevParts = append(sevParts, fmt.Sprintf("%d %s", n, strings.ToUpper(sev)))
+		}
+	}
+
+	out := strings.Join(parts, ", ")
+	if len(sevParts) > 0 {
+		out += " (affected by severity: " + strings.Join(sevParts, ", ") + ")"
+	}
+	return out
+}
+
+// severityOf returns the finding's canonical severity, or an empty string.
+func severityOf(f domain.Finding) string {
+	if f.Risk == nil {
+		return ""
+	}
+	return f.Risk.Severity
 }
