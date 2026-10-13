@@ -21,8 +21,11 @@ func main() {
 
 	if err := cli.Run(os.Args[1:]); err != nil {
 		// A downstream consumer that stops reading (for example a command
-		// piped into head) closes the pipe; that is a clean stop, not a
-		// failure, so it stays quiet and exits zero.
+		// piped into head) closes the pipe. This path handles the error as
+		// a clean stop, without a spurious message. On Unix a reader that
+		// closes stdout early ends the process with SIGPIPE (exit 141)
+		// before this code runs, which is standard shell behavior; on
+		// Windows this returns and exits zero.
 		if isBrokenPipe(err) {
 			return
 		}

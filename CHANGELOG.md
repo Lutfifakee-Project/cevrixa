@@ -52,8 +52,11 @@ how a report is written and shaped.
 ### Fixed
 
 - A closed output pipe (for example piping into `head` or a consumer that
-  exits early) no longer prints a spurious write error or exits non-zero.
-  Real write errors, such as an unwritable `--output-file` path, still fail.
+  exits early) no longer prints a spurious write error. On Windows the
+  process still exits cleanly; on Unix a reader that closes stdout early
+  ends the process with the standard SIGPIPE status (exit 141), which is
+  normal shell behavior. Real write errors, such as an unwritable
+  `--output-file` path, still fail on both platforms.
 
 ### Detection
 
