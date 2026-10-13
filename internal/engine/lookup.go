@@ -1,11 +1,16 @@
 package engine
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/Lutfifakee-Project/cevrixa/internal/domain"
 )
+
+// ErrNotFound reports that a vulnerability ID is not present in the dataset.
+// It lets callers distinguish a genuine miss from a store or parse failure.
+var ErrNotFound = errors.New("vulnerability not found")
 
 // FindByID returns the vulnerability record whose ID (or any alias) matches
 // vulnID. The search order is: store first (if non-nil), then embedded
@@ -31,5 +36,5 @@ func FindByID(vulnID string, opts Options) (domain.Vulnerability, error) {
 			}
 		}
 	}
-	return domain.Vulnerability{}, fmt.Errorf("engine: vulnerability %q not found", vulnID)
+	return domain.Vulnerability{}, fmt.Errorf("engine: vulnerability %q: %w", vulnID, ErrNotFound)
 }

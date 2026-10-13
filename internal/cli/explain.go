@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -86,9 +87,22 @@ func buildExplainReport(flags explainFlags) (output.ExplainReport, error) {
 
 	vuln, err := engine.FindByID(flags.VulnID, opts)
 	if err != nil {
-		return output.ExplainReport{}, fmt.Errorf("explain: %w (hint: run 'cevrixa sync nvd --days 30' or pass --db path)", err)
+		if !errors.Is(err, engine.ErrNotFound) {
+			return output.ExplainReport{}, fmt.Errorf("explain: %w", err)
+		}
+		fetched, ferr := fetchVulnByID(context.Background(), flags.VulnID)
+		switch {
+		case ferr == nil:
+			vuln = fetched
+			trace.Add("load vulnerability", domain.TraceWarn, vuln.ID+" not in local dataset; fetched from NVD")
+		case errors.Is(ferr, errCVENotInNVD):
+			return output.ExplainReport{}, fmt.Errorf("explain: %q is not in the local dataset and NVD has no record for it", flags.VulnID)
+		default:
+			return output.ExplainReport{}, fmt.Errorf("explain: %q is not in the local dataset; %w", flags.VulnID, ferr)
+		}
+	} else {
+		trace.Add("load vulnerability", domain.TraceOK, vuln.ID+" from "+vuln.Source)
 	}
-	trace.Add("load vulnerability", domain.TraceOK, vuln.ID+" from "+vuln.Source)
 
 	report := output.ExplainReport{
 		Vulnerability: vuln,

@@ -20,6 +20,9 @@ import (
 	syncpkg "github.com/Lutfifakee-Project/cevrixa/internal/sync"
 )
 
+// maxNVDDays is the NVD API 2.0 maximum for a single last-modified date range.
+const maxNVDDays = 120
+
 type syncFlags struct {
 	Target      string
 	DBPath      string
@@ -324,6 +327,9 @@ func parseSyncArgs(args []string) (syncFlags, error) {
 				return f, fmt.Errorf("sync: --days requires a positive integer")
 			}
 			f.Days = n
+			if n > maxNVDDays {
+				return f, fmt.Errorf("sync: --days %d exceeds the NVD limit of %d days; use --full for full history", n, maxNVDDays)
+			}
 		case "--purl":
 			f.PURL = value
 		case "--package":
